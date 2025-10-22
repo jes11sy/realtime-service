@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { EventsModule } from './events/events.module';
 import { BroadcastModule } from './broadcast/broadcast.module';
 import { StatsModule } from './stats/stats.module';
-import { RedisModule } from './redis/redis.module';
+// import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './auth/auth.module';
 
 @Module({
@@ -11,7 +11,7 @@ import { AuthModule } from './auth/auth.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    RedisModule,
+    // RedisModule,
     AuthModule,
     EventsModule,
     BroadcastModule,
