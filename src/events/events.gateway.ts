@@ -167,15 +167,16 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   }
 
   broadcastToAll(event: string, data: any) {
-    this.server.emit(event, data);
+    const connectedCount = this.getConnectedCount();
+    const connectedUsers = this.getConnectedUsers();
     
-    // Publish to Redis for other instances
-    if (this.redisService.isRedisConnected()) {
-      this.redisService.publish('socket-broadcast', {
-        event,
-        data,
-      });
-    }
+    this.logger.log(`📡 [broadcastToAll] Event: ${event}, Connected users: ${connectedCount}, Users: ${JSON.stringify(connectedUsers)}`);
+    
+    this.server.emit(event, data);
+    this.logger.debug(`✅ [broadcastToAll] Emitted ${event} to ${connectedCount} users via Socket.IO`);
+    
+    // ❌ НЕ публикуем в Redis для broadcastToAll, чтобы избежать дублирования
+    // Redis уже отправит это событие назад на эту инстанцию если есть другие реплики
   }
 
   broadcastToUser(userId: number, event: string, data: any) {
