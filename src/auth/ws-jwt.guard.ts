@@ -14,6 +14,12 @@ export class WsJwtGuard implements CanActivate {
       const client: Socket = context.switchToWs().getClient();
       const data = context.switchToWs().getData();
       
+      // ✅ Если клиент уже аутентифицирован, разрешаем операцию
+      if (client.data.user) {
+        this.logger.debug(`✅ User already authenticated: ${client.data.user.userId}`);
+        return true;
+      }
+      
       // Сначала проверяем токен из события (для authenticate)
       let token = data?.token;
       
