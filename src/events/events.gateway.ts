@@ -40,6 +40,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
 
   handleConnection(client: Socket) {
     this.logger.log(`Client connecting: ${client.id}`);
+    this.logger.log(`📌 [handleConnection] Waiting for authenticate event from client ${client.id}`);
     
     // Клиент должен пройти аутентификацию через событие 'authenticate'
     client.emit('connected', {
@@ -52,7 +53,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   handleDisconnect(client: Socket) {
     const user = this.connectedUsers.get(client.id);
     if (user) {
-      this.logger.log(`User disconnected: ${user.userId} (${client.id})`);
+      this.logger.log(`❌ [handleDisconnect] User disconnected: ${user.userId} (${client.id})`);
       this.connectedUsers.delete(client.id);
       
       // Уведомляем других пользователей
@@ -62,7 +63,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
         timestamp: new Date().toISOString(),
       });
     } else {
-      this.logger.log(`Client disconnected: ${client.id}`);
+      this.logger.log(`⚠️ [handleDisconnect] Client disconnected before authentication: ${client.id}`);
     }
   }
 

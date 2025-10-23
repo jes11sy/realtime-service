@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { EventsGateway } from '../events/events.gateway';
+import { TelegramService } from '../telegram/telegram.service';
 import {
   BroadcastCallDto,
   BroadcastOrderDto,
@@ -8,7 +9,10 @@ import {
 
 @Injectable()
 export class BroadcastService {
-  constructor(private eventsGateway: EventsGateway) {}
+  constructor(
+    private eventsGateway: EventsGateway,
+    private telegramService: TelegramService,
+  ) {}
 
   broadcastNewCall(dto: BroadcastCallDto) {
     const { call, rooms = ['operators'] } = dto;
@@ -143,6 +147,14 @@ export class BroadcastService {
   // Avito-specific broadcast methods
   broadcastAvitoNewMessage(data: any) {
     this.eventsGateway.broadcastToAll('avito-new-message', data);
+    
+    // 📱 Отправляем в Telegram
+    const accountName = data.accountName || 'Неизвестный аккаунт';
+    this.telegramService.sendAvitoNewMessage(accountName, {
+      chatId: data.chatId,
+      message: data.message,
+    }).catch(err => console.error('Telegram send failed:', err));
+    
     return { success: true, message: 'Avito new message broadcasted' };
   }
 

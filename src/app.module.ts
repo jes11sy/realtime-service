@@ -5,6 +5,7 @@ import { BroadcastModule } from './broadcast/broadcast.module';
 import { StatsModule } from './stats/stats.module';
 // import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './auth/auth.module';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AuthModule } from './auth/auth.module';
     EventsModule,
     BroadcastModule,
     StatsModule,
+    TelegramModule,
   ],
 })
 export class AppModule {}
