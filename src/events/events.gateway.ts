@@ -18,7 +18,7 @@ import { RedisService } from '../redis/redis.service';
     origin: process.env.CORS_ORIGIN?.split(',') || true,
     credentials: true,
   },
-  transports: ['websocket', 'polling'],
+  transports: ['websocket'],
 })
 export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
