@@ -16,14 +16,19 @@ export class TelegramService {
 
     try {
       const text = `📬 Пришло новое сообщение на аккаунт "${accountName}"\n\n${message}`;
+      const payload = {
+        chat_id: Number(this.chatId),
+        text,
+        parse_mode: 'HTML',
+      };
 
-      await axios.post(
+      this.logger.log(`📤 Sending Telegram payload: ${JSON.stringify(payload)}`);
+      this.logger.log(`📤 Bot token: ${this.botToken?.slice(0, 10)}...`);
+      this.logger.log(`📤 Chat ID (as number): ${Number(this.chatId)}`);
+
+      const response = await axios.post(
         `${this.API_URL}/bot${this.botToken}/sendMessage`,
-        {
-          chat_id: Number(this.chatId),  // ← Конвертируем в число!
-          text,
-          parse_mode: 'HTML',
-        },
+        payload,
         {
           timeout: 5000,
         }
@@ -32,6 +37,9 @@ export class TelegramService {
       this.logger.log(`✅ Telegram notification sent for account: ${accountName}`);
     } catch (error: any) {
       this.logger.error(`❌ Failed to send Telegram notification: ${error.message}`);
+      if (error.response?.data) {
+        this.logger.error(`📋 Telegram API response: ${JSON.stringify(error.response.data)}`);
+      }
       // Не выбрасываем ошибку, чтобы не сломать основной поток
     }
   }
