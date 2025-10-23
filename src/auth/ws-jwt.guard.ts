@@ -12,9 +12,18 @@ export class WsJwtGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     try {
       const client: Socket = context.switchToWs().getClient();
-      const token = this.extractTokenFromHandshake(client);
+      const data = context.switchToWs().getData();
+      
+      // Сначала проверяем токен из события (для authenticate)
+      let token = data?.token;
+      
+      // Если нет в событии, проверяем handshake
+      if (!token) {
+        token = this.extractTokenFromHandshake(client);
+      }
 
       if (!token) {
+        this.logger.warn(`❌ Missing authentication token for client ${client.id}`);
         throw new WsException('Missing authentication token');
       }
 
@@ -25,9 +34,10 @@ export class WsJwtGuard implements CanActivate {
         role: payload.role,
       };
 
+      this.logger.log(`✅ User authenticated: ${payload.sub || payload.userId}`);
       return true;
-    } catch (error) {
-      this.logger.error(`Authentication failed: ${error.message}`);
+    } catch (error: any) {
+      this.logger.error(`❌ Authentication failed: ${error.message}`);
       throw new WsException('Invalid authentication token');
     }
   }
