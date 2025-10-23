@@ -20,7 +20,7 @@ export class TelegramService {
       await axios.post(
         `${this.API_URL}/bot${this.botToken}/sendMessage`,
         {
-          chat_id: this.chatId,
+          chat_id: Number(this.chatId),  // ← Конвертируем в число!
           text,
           parse_mode: 'HTML',
         },
