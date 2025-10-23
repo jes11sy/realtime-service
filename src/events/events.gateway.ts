@@ -69,7 +69,13 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   @SubscribeMessage('authenticate')
   @UseGuards(WsJwtGuard)
   handleAuthenticate(@MessageBody() data: any, @ConnectedSocket() client: Socket) {
+    this.logger.log(`📝 [authenticate] Received for client ${client.id}`);
+    
     const user = client.data.user;
+    if (!user) {
+      this.logger.warn(`⚠️ [authenticate] No user data for client ${client.id}`);
+      return { success: false, error: 'No user data' };
+    }
     
     this.connectedUsers.set(client.id, {
       socketId: client.id,
@@ -77,16 +83,19 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       role: user.role,
     });
 
-    this.logger.log(`User authenticated: ${user.userId} (${user.role})`);
+    this.logger.log(`✅ [authenticate] User authenticated: ${user.userId} (${user.role}) - ${client.id}`);
 
     // Автоматически добавляем в комнату по роли
     const roleRoom = user.role.toLowerCase();
     client.join(roleRoom);
+    this.logger.log(`📌 [authenticate] Client joined room: ${roleRoom}`);
     
     if (roleRoom === 'callcentre_operator') {
       client.join('operators');
+      this.logger.log(`📌 [authenticate] Client joined room: operators`);
     } else if (roleRoom === 'director') {
       client.join('directors');
+      this.logger.log(`📌 [authenticate] Client joined room: directors`);
     }
 
     // Уведомляем клиента об успешной аутентификации
@@ -208,9 +217,14 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
 
   // Public method to emit events from avito-service webhook
   public emitAvitoEvent(event: string, data: any) {
-    this.logger.debug(`📡 Emitting Avito event: ${event}`, data);
+    const connectedCount = this.getConnectedCount();
+    const connectedUsers = this.getConnectedUsers();
+    
+    this.logger.log(`📡 [emitAvitoEvent] Event: ${event}, Connected users: ${connectedCount}, Users: ${JSON.stringify(connectedUsers)}`);
+    
     // Broadcast to ALL connected clients (no room filtering needed)
     this.server.emit(event, data);
+    this.logger.debug(`✅ [emitAvitoEvent] Emitted ${event} to ${connectedCount} users via Socket.IO`);
     
     // Also publish to Redis for horizontal scaling
     if (this.redisService.isRedisConnected()) {
@@ -218,6 +232,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
         event,
         data,
       });
+      this.logger.debug(`✅ [emitAvitoEvent] Published ${event} to Redis`);
     }
   }
 }
