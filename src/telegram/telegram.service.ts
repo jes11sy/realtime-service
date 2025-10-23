@@ -15,7 +15,7 @@ export class TelegramService {
     }
 
     try {
-      const text = `📬 Пришло новое сообщение на аккаунт "${accountName}"\n\n${message}`;
+      const text = `📬 Пришло новое сообщение на аккаунт <b>${accountName}</b>`;
       const payload = {
         chat_id: Number(this.chatId),
         text,
