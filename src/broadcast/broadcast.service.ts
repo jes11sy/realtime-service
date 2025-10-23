@@ -139,5 +139,21 @@ export class BroadcastService {
       rooms: rooms || ['all'],
     };
   }
+
+  // Avito-specific broadcast methods
+  broadcastAvitoNewMessage(data: any) {
+    this.eventsGateway.broadcastToAll('avito-new-message', data);
+    return { success: true, message: 'Avito new message broadcasted' };
+  }
+
+  broadcastAvitoChatUpdated(data: any) {
+    this.eventsGateway.broadcastToAll('avito-chat-updated', data);
+    return { success: true, message: 'Avito chat updated broadcasted' };
+  }
+
+  broadcastAvitoNotification(data: any) {
+    this.eventsGateway.broadcastToAll('avito-notification', data);
+    return { success: true, message: 'Avito notification broadcasted' };
+  }
 }
 

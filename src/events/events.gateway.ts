@@ -205,5 +205,20 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
 
     this.logger.log('✅ Redis subscriptions setup complete');
   }
+
+  // Public method to emit events from avito-service webhook
+  public emitAvitoEvent(event: string, data: any) {
+    this.logger.debug(`📡 Emitting Avito event: ${event}`, data);
+    // Broadcast to ALL connected clients (no room filtering needed)
+    this.server.emit(event, data);
+    
+    // Also publish to Redis for horizontal scaling
+    if (this.redisService.isRedisConnected()) {
+      this.redisService.publish('socket-broadcast', {
+        event,
+        data,
+      });
+    }
+  }
 }
 

@@ -14,6 +14,28 @@ export class BroadcastController {
 
   constructor(private broadcastService: BroadcastService) {}
 
+  @Post('avito-event')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Broadcast avito events from webhook' })
+  async broadcastAvitoEvent(@Body() dto: { event: string; data: any; token?: string }) {
+    if (dto.token !== process.env.WEBHOOK_TOKEN) {
+      return { success: false, message: 'Invalid token' };
+    }
+    
+    this.logger.log(`Broadcasting avito event: ${dto.event}`);
+    
+    // Call broadcast service method
+    if (dto.event === 'avito-new-message') {
+      return this.broadcastService.broadcastAvitoNewMessage(dto.data);
+    } else if (dto.event === 'avito-chat-updated') {
+      return this.broadcastService.broadcastAvitoChatUpdated(dto.data);
+    } else if (dto.event === 'avito-notification') {
+      return this.broadcastService.broadcastAvitoNotification(dto.data);
+    }
+    
+    return { success: false, message: 'Unknown event' };
+  }
+
   @Post('call-new')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Broadcast new call event' })
