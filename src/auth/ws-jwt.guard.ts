@@ -14,6 +14,8 @@ export class WsJwtGuard implements CanActivate {
       const client: Socket = context.switchToWs().getClient();
       const data = context.switchToWs().getData();
       
+      this.logger.debug(`🔍 [WsJwtGuard] Checking authentication for client ${client.id}`);
+      
       // ✅ Если клиент уже аутентифицирован, разрешаем операцию
       if (client.data.user) {
         this.logger.debug(`✅ User already authenticated: ${client.data.user.userId}`);
@@ -22,28 +24,35 @@ export class WsJwtGuard implements CanActivate {
       
       // Сначала проверяем токен из события (для authenticate)
       let token = data?.token;
+      this.logger.debug(`🔍 [WsJwtGuard] Token from event data: ${token ? 'Present' : 'Missing'}`);
       
       // Если нет в событии, проверяем handshake
       if (!token) {
         token = this.extractTokenFromHandshake(client);
+        this.logger.debug(`🔍 [WsJwtGuard] Token from handshake: ${token ? 'Present' : 'Missing'}`);
       }
 
       if (!token) {
         this.logger.warn(`❌ Missing authentication token for client ${client.id}`);
+        client.emit('error', { message: 'Missing authentication token' });
         throw new WsException('Missing authentication token');
       }
 
+      this.logger.debug(`🔍 [WsJwtGuard] Verifying token for client ${client.id}`);
       const payload = this.jwtService.verify(token);
+      this.logger.debug(`🔍 [WsJwtGuard] Token payload:`, JSON.stringify(payload));
+      
       client.data.user = {
         userId: payload.sub || payload.userId,
         login: payload.login,
         role: payload.role,
       };
 
-      this.logger.log(`✅ User authenticated: ${payload.sub || payload.userId}`);
+      this.logger.log(`✅ User authenticated: ${payload.sub || payload.userId} (${payload.role})`);
       return true;
     } catch (error: any) {
-      this.logger.error(`❌ Authentication failed: ${error.message}`);
+      this.logger.error(`❌ Authentication failed for client ${context.switchToWs().getClient().id}: ${error.message}`);
+      context.switchToWs().getClient().emit('error', { message: `Authentication failed: ${error.message}` });
       throw new WsException('Invalid authentication token');
     }
   }

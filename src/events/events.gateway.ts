@@ -70,11 +70,12 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   @SubscribeMessage('authenticate')
   @UseGuards(WsJwtGuard)
   handleAuthenticate(@MessageBody() data: any, @ConnectedSocket() client: Socket) {
-    this.logger.log(`📝 [authenticate] Received for client ${client.id}`);
+    this.logger.log(`📝 [authenticate] Received for client ${client.id}, data:`, JSON.stringify(data));
     
     const user = client.data.user;
     if (!user) {
-      this.logger.warn(`⚠️ [authenticate] No user data for client ${client.id}`);
+      this.logger.warn(`⚠️ [authenticate] No user data for client ${client.id} after guard`);
+      client.emit('error', { message: 'No user data' });
       return { success: false, error: 'No user data' };
     }
     
@@ -113,6 +114,8 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       role: user.role,
       timestamp: new Date().toISOString(),
     });
+
+    this.logger.log(`✅ [authenticate] Emitted authenticated event to client ${client.id}`);
 
     return { success: true };
   }

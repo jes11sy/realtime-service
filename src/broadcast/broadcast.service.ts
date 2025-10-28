@@ -146,6 +146,9 @@ export class BroadcastService {
 
   // Avito-specific broadcast methods
   broadcastAvitoNewMessage(data: any) {
+    console.log('🔔 [BroadcastService] Broadcasting avito-new-message');
+    console.log('🔔 [BroadcastService] Data:', JSON.stringify(data, null, 2));
+    
     this.eventsGateway.broadcastToAll('avito-new-message', data);
     
     // 📱 Отправляем в Telegram
@@ -155,16 +158,21 @@ export class BroadcastService {
       message: data.message,
     }).catch(err => console.error('Telegram send failed:', err));
     
+    console.log('✅ [BroadcastService] Avito new message broadcasted');
     return { success: true, message: 'Avito new message broadcasted' };
   }
 
   broadcastAvitoChatUpdated(data: any) {
+    console.log('🔔 [BroadcastService] Broadcasting avito-chat-updated');
     this.eventsGateway.broadcastToAll('avito-chat-updated', data);
+    console.log('✅ [BroadcastService] Avito chat updated broadcasted');
     return { success: true, message: 'Avito chat updated broadcasted' };
   }
 
   broadcastAvitoNotification(data: any) {
+    console.log('🔔 [BroadcastService] Broadcasting avito-notification');
     this.eventsGateway.broadcastToAll('avito-notification', data);
+    console.log('✅ [BroadcastService] Avito notification broadcasted');
     return { success: true, message: 'Avito notification broadcasted' };
   }
 }

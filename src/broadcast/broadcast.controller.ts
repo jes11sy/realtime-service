@@ -18,22 +18,38 @@ export class BroadcastController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Broadcast avito events from webhook' })
   async broadcastAvitoEvent(@Body() dto: { event: string; data: any; token?: string }) {
+    this.logger.log(`🔔 ===== RECEIVED BROADCAST REQUEST =====`);
+    this.logger.log(`🔔 Event: ${dto.event}`);
+    this.logger.log(`🔔 Data keys: ${Object.keys(dto.data || {}).join(', ')}`);
+    this.logger.log(`🔔 Token received: ${dto.token ? 'Yes' : 'No'}`);
+    this.logger.log(`🔔 Expected token: ${process.env.WEBHOOK_TOKEN ? 'Set' : 'Not set'}`);
+    
     if (dto.token !== process.env.WEBHOOK_TOKEN) {
+      this.logger.error(`❌ Invalid token! Expected: ${process.env.WEBHOOK_TOKEN}, Got: ${dto.token}`);
+      this.logger.error(`❌ ========================================`);
       return { success: false, message: 'Invalid token' };
     }
     
-    this.logger.log(`Broadcasting avito event: ${dto.event}`);
+    this.logger.log(`✅ Token validated`);
+    this.logger.log(`📡 Broadcasting avito event: ${dto.event}`);
     
     // Call broadcast service method
+    let result;
     if (dto.event === 'avito-new-message') {
-      return this.broadcastService.broadcastAvitoNewMessage(dto.data);
+      result = this.broadcastService.broadcastAvitoNewMessage(dto.data);
     } else if (dto.event === 'avito-chat-updated') {
-      return this.broadcastService.broadcastAvitoChatUpdated(dto.data);
+      result = this.broadcastService.broadcastAvitoChatUpdated(dto.data);
     } else if (dto.event === 'avito-notification') {
-      return this.broadcastService.broadcastAvitoNotification(dto.data);
+      result = this.broadcastService.broadcastAvitoNotification(dto.data);
+    } else {
+      this.logger.error(`❌ Unknown event: ${dto.event}`);
+      result = { success: false, message: 'Unknown event' };
     }
     
-    return { success: false, message: 'Unknown event' };
+    this.logger.log(`✅ Broadcast result:`, result);
+    this.logger.log(`✅ ========================================`);
+    
+    return result;
   }
 
   @Post('call-new')
