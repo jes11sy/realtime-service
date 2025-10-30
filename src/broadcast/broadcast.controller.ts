@@ -1,5 +1,6 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Logger } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Logger, UnauthorizedException } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import * as crypto from 'crypto';
 import { BroadcastService } from './broadcast.service';
 import {
   BroadcastCallDto,
@@ -14,24 +15,37 @@ export class BroadcastController {
 
   constructor(private broadcastService: BroadcastService) {}
 
+  private secureCompare(a: string, b: string): boolean {
+    if (!a || !b || a.length !== b.length) return false;
+    try {
+      return crypto.timingSafeEqual(Buffer.from(a, 'utf-8'), Buffer.from(b, 'utf-8'));
+    } catch {
+      return false;
+    }
+  }
+
+  private validateWebhookToken(token: string): void {
+    const expectedToken = process.env.WEBHOOK_TOKEN;
+    
+    if (!expectedToken) {
+      this.logger.error('❌ WEBHOOK_TOKEN is not configured');
+      throw new UnauthorizedException('Webhook authentication not configured');
+    }
+
+    if (!token || !this.secureCompare(token, expectedToken)) {
+      this.logger.error('❌ Invalid webhook token provided');
+      throw new UnauthorizedException('Invalid webhook token');
+    }
+  }
+
   @Post('avito-event')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Broadcast avito events from webhook' })
   async broadcastAvitoEvent(@Body() dto: { event: string; data: any; token?: string }) {
-    this.logger.log(`🔔 ===== RECEIVED BROADCAST REQUEST =====`);
-    this.logger.log(`🔔 Event: ${dto.event}`);
-    this.logger.log(`🔔 Data keys: ${Object.keys(dto.data || {}).join(', ')}`);
-    this.logger.log(`🔔 Token received: ${dto.token ? 'Yes' : 'No'}`);
-    this.logger.log(`🔔 Expected token: ${process.env.WEBHOOK_TOKEN ? 'Set' : 'Not set'}`);
+    this.logger.log(`🔔 Received broadcast request for event: ${dto.event}`);
     
-    if (dto.token !== process.env.WEBHOOK_TOKEN) {
-      this.logger.error(`❌ Invalid token! Expected: ${process.env.WEBHOOK_TOKEN}, Got: ${dto.token}`);
-      this.logger.error(`❌ ========================================`);
-      return { success: false, message: 'Invalid token' };
-    }
-    
-    this.logger.log(`✅ Token validated`);
-    this.logger.log(`📡 Broadcasting avito event: ${dto.event}`);
+    // ✅ Безопасная валидация токена без логирования
+    this.validateWebhookToken(dto.token);
     
     // Call broadcast service method
     let result;
@@ -42,12 +56,9 @@ export class BroadcastController {
     } else if (dto.event === 'avito-notification') {
       result = this.broadcastService.broadcastAvitoNotification(dto.data);
     } else {
-      this.logger.error(`❌ Unknown event: ${dto.event}`);
-      result = { success: false, message: 'Unknown event' };
+      this.logger.warn(`⚠️ Unknown event type: ${dto.event}`);
+      throw new UnauthorizedException('Unknown event type');
     }
-    
-    this.logger.log(`✅ Broadcast result:`, result);
-    this.logger.log(`✅ ========================================`);
     
     return result;
   }
@@ -56,10 +67,7 @@ export class BroadcastController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Broadcast new call event' })
   async broadcastNewCall(@Body() dto: BroadcastCallDto) {
-    if (dto.token !== process.env.WEBHOOK_TOKEN) {
-      return { success: false, message: 'Invalid token' };
-    }
-
+    this.validateWebhookToken(dto.token);
     this.logger.log(`Broadcasting new call: ${dto.call.id}`);
     return this.broadcastService.broadcastNewCall(dto);
   }
@@ -68,10 +76,7 @@ export class BroadcastController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Broadcast call update event' })
   async broadcastCallUpdated(@Body() dto: BroadcastCallDto) {
-    if (dto.token !== process.env.WEBHOOK_TOKEN) {
-      return { success: false, message: 'Invalid token' };
-    }
-
+    this.validateWebhookToken(dto.token);
     this.logger.log(`Broadcasting call update: ${dto.call.id}`);
     return this.broadcastService.broadcastCallUpdated(dto);
   }
@@ -80,10 +85,7 @@ export class BroadcastController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Broadcast call ended event' })
   async broadcastCallEnded(@Body() dto: BroadcastCallDto) {
-    if (dto.token !== process.env.WEBHOOK_TOKEN) {
-      return { success: false, message: 'Invalid token' };
-    }
-
+    this.validateWebhookToken(dto.token);
     this.logger.log(`Broadcasting call ended: ${dto.call.id}`);
     return this.broadcastService.broadcastCallEnded(dto);
   }
@@ -92,10 +94,7 @@ export class BroadcastController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Broadcast new order event' })
   async broadcastNewOrder(@Body() dto: BroadcastOrderDto) {
-    if (dto.token !== process.env.WEBHOOK_TOKEN) {
-      return { success: false, message: 'Invalid token' };
-    }
-
+    this.validateWebhookToken(dto.token);
     this.logger.log(`Broadcasting new order: ${dto.order.id}`);
     return this.broadcastService.broadcastNewOrder(dto);
   }
@@ -104,10 +103,7 @@ export class BroadcastController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Broadcast order update event' })
   async broadcastOrderUpdated(@Body() dto: BroadcastOrderDto) {
-    if (dto.token !== process.env.WEBHOOK_TOKEN) {
-      return { success: false, message: 'Invalid token' };
-    }
-
+    this.validateWebhookToken(dto.token);
     this.logger.log(`Broadcasting order update: ${dto.order.id}`);
     return this.broadcastService.broadcastOrderUpdated(dto);
   }
@@ -116,10 +112,7 @@ export class BroadcastController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Broadcast notification' })
   async broadcastNotification(@Body() dto: BroadcastNotificationDto) {
-    if (dto.token !== process.env.WEBHOOK_TOKEN) {
-      return { success: false, message: 'Invalid token' };
-    }
-
+    this.validateWebhookToken(dto.token);
     this.logger.log(`Broadcasting notification: ${dto.notification.type}`);
     return this.broadcastService.broadcastNotification(dto);
   }

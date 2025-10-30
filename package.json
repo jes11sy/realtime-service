@@ -9,7 +9,8 @@
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
-    "start:prod": "node dist/main"
+    "start:prod": "NODE_ENV=production node dist/main",
+    "audit:security": "npm audit --production"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
@@ -22,20 +23,22 @@
     "@nestjs/passport": "^10.0.3",
     "@nestjs/swagger": "^7.1.17",
     "socket.io": "^4.7.2",
-    "socket.io-redis": "^6.1.1",
     "redis": "^4.6.11",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1",
-    "axios": "^1.6.2",
+    "axios": "^1.7.4",
     "class-validator": "^0.14.0",
-    "class-transformer": "^0.5.1"
+    "class-transformer": "^0.5.1",
+    "compression": "^1.7.4",
+    "helmet": "^7.1.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.2.1",
     "@nestjs/schematics": "^10.0.3",
     "@types/node": "^20.10.5",
     "@types/passport-jwt": "^3.0.13",
+    "@types/compression": "^1.7.5",
     "typescript": "^5.3.3"
   }
 }

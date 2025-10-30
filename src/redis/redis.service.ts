@@ -17,7 +17,20 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       socket: {
         host: redisHost,
         port: redisPort,
+        reconnectStrategy: (retries: number) => {
+          if (retries > 10) {
+            this.logger.error('❌ Redis reconnection failed after 10 attempts');
+            return false; // Прекратить попытки
+          }
+          const delay = Math.min(retries * 100, 3000);
+          this.logger.warn(`⚠️ Redis reconnecting... Attempt ${retries}, delay: ${delay}ms`);
+          return delay; // Exponential backoff
+        },
       },
+      database: 0,
+      maxRetriesPerRequest: 3,
+      enableReadyCheck: true,
+      lazyConnect: false,
       ...(redisPassword && { password: redisPassword }),
     };
 
@@ -25,11 +38,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       // Pub client
       this.pubClient = createClient(config);
       this.pubClient.on('error', (err) => this.logger.error('Redis Pub Client Error:', err));
+      this.pubClient.on('reconnecting', () => this.logger.warn('Redis Pub Client reconnecting...'));
       await this.pubClient.connect();
 
       // Sub client
       this.subClient = createClient(config);
       this.subClient.on('error', (err) => this.logger.error('Redis Sub Client Error:', err));
+      this.subClient.on('reconnecting', () => this.logger.warn('Redis Sub Client reconnecting...'));
       await this.subClient.connect();
 
       this.isConnected = true;
@@ -84,6 +99,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   isRedisConnected(): boolean {
     return this.isConnected;
+  }
+
+  getPubClient(): RedisClientType {
+    return this.pubClient;
+  }
+
+  getSubClient(): RedisClientType {
+    return this.subClient;
   }
 }
 

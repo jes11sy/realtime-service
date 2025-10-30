@@ -17,15 +17,20 @@ export class BroadcastService {
   broadcastNewCall(dto: BroadcastCallDto) {
     const { call, rooms = ['operators'] } = dto;
 
-    // Broadcast to specified rooms
-    rooms.forEach((room) => {
-      this.eventsGateway.broadcastToRoom(room, 'call:new', call);
-    });
+    // ✅ Параллельная отправка вместо последовательной
+    const roomPromises = rooms.map((room) => 
+      Promise.resolve(this.eventsGateway.broadcastToRoom(room, 'call:new', call))
+    );
 
     // Broadcast to operator's personal room if specified
     if (call.operatorId) {
-      this.eventsGateway.broadcastToRoom(`operator:${call.operatorId}`, 'call:new', call);
+      roomPromises.push(
+        Promise.resolve(this.eventsGateway.broadcastToRoom(`operator:${call.operatorId}`, 'call:new', call))
+      );
     }
+
+    // Выполняем все параллельно
+    Promise.all(roomPromises).catch(err => console.error('Broadcast error:', err));
 
     return {
       success: true,
@@ -146,33 +151,25 @@ export class BroadcastService {
 
   // Avito-specific broadcast methods
   broadcastAvitoNewMessage(data: any) {
-    console.log('🔔 [BroadcastService] Broadcasting avito-new-message');
-    console.log('🔔 [BroadcastService] Data:', JSON.stringify(data, null, 2));
-    
     this.eventsGateway.broadcastToAll('avito-new-message', data);
     
-    // 📱 Отправляем в Telegram
+    // 📱 Отправляем в Telegram (не блокируя)
     const accountName = data.accountName || 'Неизвестный аккаунт';
     this.telegramService.sendAvitoNewMessage(accountName, {
       chatId: data.chatId,
       message: data.message,
-    }).catch(err => console.error('Telegram send failed:', err));
+    });
     
-    console.log('✅ [BroadcastService] Avito new message broadcasted');
     return { success: true, message: 'Avito new message broadcasted' };
   }
 
   broadcastAvitoChatUpdated(data: any) {
-    console.log('🔔 [BroadcastService] Broadcasting avito-chat-updated');
     this.eventsGateway.broadcastToAll('avito-chat-updated', data);
-    console.log('✅ [BroadcastService] Avito chat updated broadcasted');
     return { success: true, message: 'Avito chat updated broadcasted' };
   }
 
   broadcastAvitoNotification(data: any) {
-    console.log('🔔 [BroadcastService] Broadcasting avito-notification');
     this.eventsGateway.broadcastToAll('avito-notification', data);
-    console.log('✅ [BroadcastService] Avito notification broadcasted');
     return { success: true, message: 'Avito notification broadcasted' };
   }
 }

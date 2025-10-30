@@ -55,6 +55,9 @@ export class TelegramService {
     }
   ): Promise<void> {
     const messageText = data.message.content?.text || '(Сообщение без текста)';
-    await this.sendNotification(accountName, messageText);
+    // ✅ Отправка в фоне без await для не блокирования основного потока
+    this.sendNotification(accountName, messageText).catch(err => {
+      this.logger.error(`❌ Failed to send Telegram notification: ${err.message}`);
+    });
   }
 }

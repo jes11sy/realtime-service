@@ -40,7 +40,7 @@ export class WsJwtGuard implements CanActivate {
 
       this.logger.debug(`🔍 [WsJwtGuard] Verifying token for client ${client.id}`);
       const payload = this.jwtService.verify(token);
-      this.logger.debug(`🔍 [WsJwtGuard] Token payload:`, JSON.stringify(payload));
+      // ✅ Не логируем payload - содержит чувствительные данные
       
       client.data.user = {
         userId: payload.sub || payload.userId,
