@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe, Logger, LogLevel } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import * as compression from 'compression';
@@ -8,7 +8,7 @@ import { AllExceptionsFilter } from './filters/http-exception.filter';
 
 async function bootstrap() {
   // Логи по окружению
-  const logLevels = process.env.NODE_ENV === 'production' 
+  const logLevels: LogLevel[] = process.env.NODE_ENV === 'production' 
     ? ['error', 'warn', 'log']
     : ['error', 'warn', 'log', 'debug'];
 
