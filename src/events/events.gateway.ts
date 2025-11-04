@@ -182,7 +182,11 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     client.join(roleRoom);
     this.logger.log(`📌 [authenticate] Client joined room: ${roleRoom}`);
     
-    if (roleRoom === 'callcentre_operator') {
+    // Для операторов добавляем в обе комнаты (singular и plural) для совместимости
+    if (roleRoom === 'operator') {
+      client.join('operators');
+      this.logger.log(`📌 [authenticate] Client joined room: operators`);
+    } else if (roleRoom === 'callcentre_operator') {
       client.join('operators');
       this.logger.log(`📌 [authenticate] Client joined room: operators`);
     } else if (roleRoom === 'director') {
