@@ -15,63 +15,38 @@ export class BroadcastService {
   ) {}
 
   broadcastNewCall(dto: BroadcastCallDto) {
-    const { call, rooms = ['operators'] } = dto;
+    const { call } = dto;
 
-    // ✅ Параллельная отправка вместо последовательной
-    const roomPromises = rooms.map((room) => 
-      Promise.resolve(this.eventsGateway.broadcastToRoom(room, 'call:new', call))
-    );
-
-    // Broadcast to operator's personal room if specified
-    if (call.operatorId) {
-      roomPromises.push(
-        Promise.resolve(this.eventsGateway.broadcastToRoom(`operator:${call.operatorId}`, 'call:new', call))
-      );
-    }
-
-    // Выполняем все параллельно
-    Promise.all(roomPromises).catch(err => console.error('Broadcast error:', err));
+    // Отправляем ВСЕМ, как для Avito
+    this.eventsGateway.broadcastToAll('call:new', call);
 
     return {
       success: true,
-      message: 'New call broadcasted',
-      rooms,
+      message: 'New call broadcasted to all',
     };
   }
 
   broadcastCallUpdated(dto: BroadcastCallDto) {
-    const { call, rooms = ['operators'] } = dto;
+    const { call } = dto;
 
-    rooms.forEach((room) => {
-      this.eventsGateway.broadcastToRoom(room, 'call:updated', call);
-    });
-
-    if (call.operatorId) {
-      this.eventsGateway.broadcastToRoom(`operator:${call.operatorId}`, 'call:updated', call);
-    }
+    // Отправляем ВСЕМ, как для Avito
+    this.eventsGateway.broadcastToAll('call:updated', call);
 
     return {
       success: true,
-      message: 'Call update broadcasted',
-      rooms,
+      message: 'Call update broadcasted to all',
     };
   }
 
   broadcastCallEnded(dto: BroadcastCallDto) {
-    const { call, rooms = ['operators'] } = dto;
+    const { call } = dto;
 
-    rooms.forEach((room) => {
-      this.eventsGateway.broadcastToRoom(room, 'call:ended', call);
-    });
-
-    if (call.operatorId) {
-      this.eventsGateway.broadcastToRoom(`operator:${call.operatorId}`, 'call:ended', call);
-    }
+    // Отправляем ВСЕМ, как для Avito
+    this.eventsGateway.broadcastToAll('call:ended', call);
 
     return {
       success: true,
-      message: 'Call ended broadcasted',
-      rooms,
+      message: 'Call ended broadcasted to all',
     };
   }
 
