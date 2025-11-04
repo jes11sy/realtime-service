@@ -292,7 +292,19 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
 
   // Broadcast methods
   broadcastToRoom(room: string, event: string, data: any) {
+    // Получаем количество клиентов в комнате
+    const socketsInRoom = this.server.sockets.adapter.rooms.get(room);
+    const clientCount = socketsInRoom ? socketsInRoom.size : 0;
+    
+    // Логируем детали трансляции
+    this.logger.log(`📡 [broadcastToRoom] Room: ${room}, Event: ${event}, Clients in room: ${clientCount}`);
+    
+    if (clientCount === 0) {
+      this.logger.warn(`⚠️ [broadcastToRoom] Room "${room}" is empty! Event "${event}" not delivered.`);
+    }
+    
     this.server.to(room).emit(event, data);
+    this.logger.debug(`✅ [broadcastToRoom] Emitted ${event} to room ${room} (${clientCount} clients)`);
     
     // Publish to Redis for other instances
     if (this.redisService.isRedisConnected()) {
