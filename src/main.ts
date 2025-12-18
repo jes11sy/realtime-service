@@ -25,10 +25,15 @@ async function bootstrap() {
     throw new Error('CORS_ORIGIN is required');
   }
 
-  // ✅ HTTPS Enforcement в production
+  // ✅ HTTPS Enforcement в production (ТОЛЬКО для внешних запросов через Nginx)
   if (process.env.NODE_ENV === 'production') {
     app.use((req, res, next) => {
-      if (!req.secure && req.get('x-forwarded-proto') !== 'https') {
+      // Разрешить HTTP для внутренних микросервисов (Docker network)
+      const isInternalRequest = req.get('host')?.includes('realtime-service') || 
+                                req.ip?.startsWith('172.') || 
+                                req.ip === '::ffff:172.18.0.';
+      
+      if (!isInternalRequest && !req.secure && req.get('x-forwarded-proto') !== 'https') {
         return res.redirect(301, 'https://' + req.get('host') + req.url);
       }
       next();
