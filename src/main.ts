@@ -25,15 +25,10 @@ async function bootstrap() {
     throw new Error('CORS_ORIGIN is required');
   }
 
-  // ✅ HTTPS Enforcement в production (ТОЛЬКО для внешних запросов через Nginx)
+  // ✅ HTTPS Enforcement в production
   if (process.env.NODE_ENV === 'production') {
     app.use((req, res, next) => {
-      // Разрешить HTTP для внутренних микросервисов (Docker network)
-      const isInternalRequest = req.get('host')?.includes('realtime-service') || 
-                                req.ip?.startsWith('172.') || 
-                                req.ip === '::ffff:172.18.0.';
-      
-      if (!isInternalRequest && !req.secure && req.get('x-forwarded-proto') !== 'https') {
+      if (!req.secure && req.get('x-forwarded-proto') !== 'https') {
         return res.redirect(301, 'https://' + req.get('host') + req.url);
       }
       next();
@@ -62,12 +57,25 @@ async function bootstrap() {
     next();
   });
 
+  // 🍪 Cookie Parser для httpOnly cookies
+  const cookieParser = require('cookie-parser');
+  app.use(cookieParser(process.env.COOKIE_SECRET || process.env.JWT_SECRET));
+  logger.log('✅ Cookie parser registered');
+
   // ✅ HTTP Compression
   app.use(compression());
 
   app.enableCors({
     origin: allowedOrigins,
     credentials: true,
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'Origin',
+      'X-Use-Cookies', // 🍪 Поддержка cookie mode
+    ],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   // ✅ Глобальный обработчик ошибок
