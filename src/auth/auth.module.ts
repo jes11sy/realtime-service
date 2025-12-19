@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './jwt.strategy';
+import { CookieJwtAuthGuard } from './guards/cookie-jwt-auth.guard';
 
 @Module({
   imports: [
@@ -11,8 +12,8 @@ import { JwtStrategy } from './jwt.strategy';
       signOptions: { expiresIn: '24h' },
     }),
   ],
-  providers: [JwtStrategy],
-  exports: [JwtModule],
+  providers: [JwtStrategy, CookieJwtAuthGuard],
+  exports: [JwtModule, CookieJwtAuthGuard],
 })
 export class AuthModule {}
 

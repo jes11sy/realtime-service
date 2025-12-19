@@ -1,6 +1,6 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
+import { CookieJwtAuthGuard } from '../auth/guards/cookie-jwt-auth.guard';
 import { StatsService } from './stats.service';
 
 @ApiTags('stats')
@@ -9,7 +9,7 @@ export class StatsController {
   constructor(private statsService: StatsService) {}
 
   @Get('connections')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(CookieJwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get active connections' })
   async getConnections() {
@@ -17,7 +17,7 @@ export class StatsController {
   }
 
   @Get('rooms')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(CookieJwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get rooms information' })
   async getRooms() {
