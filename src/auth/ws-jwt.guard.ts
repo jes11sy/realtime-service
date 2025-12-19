@@ -71,8 +71,15 @@ export class WsJwtGuard implements CanActivate {
   }
 
   private extractTokenFromHandshake(client: Socket): string | null {
+    // 🔍 ОТЛАДКА: Логируем все заголовки handshake
+    this.logger.debug(`🔍 Handshake headers: ${JSON.stringify(Object.keys(client.handshake?.headers || {}))}`);
+    this.logger.debug(`🔍 Handshake auth: ${JSON.stringify(client.handshake?.auth || {})}`);
+    this.logger.debug(`🔍 Handshake query: ${JSON.stringify(client.handshake?.query || {})}`);
+    
     // 🍪 ПРИОРИТЕТ 1: Проверяем httpOnly cookies (для новой системы аутентификации)
     const cookies = client.handshake?.headers?.cookie;
+    this.logger.debug(`🍪 Cookie header present: ${cookies ? 'YES' : 'NO'}`);
+    
     if (cookies) {
       const cookieToken = this.extractTokenFromCookies(cookies);
       if (cookieToken) {
@@ -83,11 +90,13 @@ export class WsJwtGuard implements CanActivate {
 
     // Проверяем auth объект
     if (client.handshake?.auth?.token) {
+      this.logger.debug(`✅ Token found in auth object`);
       return client.handshake.auth.token;
     }
 
     // Проверяем query параметры
     if (client.handshake?.query?.token) {
+      this.logger.debug(`✅ Token found in query params`);
       return client.handshake.query.token as string;
     }
 
@@ -96,10 +105,12 @@ export class WsJwtGuard implements CanActivate {
     if (authHeader) {
       const [type, token] = authHeader.split(' ');
       if (type === 'Bearer' && token) {
+        this.logger.debug(`✅ Token found in Authorization header`);
         return token;
       }
     }
 
+    this.logger.error(`❌ No token found in any location (cookies, auth, query, headers)`);
     return null;
   }
 
