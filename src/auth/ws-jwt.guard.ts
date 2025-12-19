@@ -58,6 +58,16 @@ export class WsJwtGuard implements CanActivate {
   }
 
   private extractTokenFromHandshake(client: Socket): string | null {
+    // 🍪 ПРИОРИТЕТ 1: Проверяем httpOnly cookies (для новой системы аутентификации)
+    const cookies = client.handshake?.headers?.cookie;
+    if (cookies) {
+      const cookieToken = this.extractTokenFromCookies(cookies);
+      if (cookieToken) {
+        this.logger.debug(`🍪 Token extracted from cookies`);
+        return cookieToken;
+      }
+    }
+
     // Проверяем auth объект
     if (client.handshake?.auth?.token) {
       return client.handshake.auth.token;
@@ -78,6 +88,31 @@ export class WsJwtGuard implements CanActivate {
     }
 
     return null;
+  }
+
+  // 🍪 Извлечение токена из cookies
+  private extractTokenFromCookies(cookieHeader: string): string | null {
+    try {
+      // Парсим cookie строку
+      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split('=');
+        acc[key] = value;
+        return acc;
+      }, {} as Record<string, string>);
+
+      // Проверяем access_token (может быть с префиксом __Host-)
+      const accessToken = cookies['access_token'] || cookies['__Host-access_token'];
+      
+      if (accessToken) {
+        // Декодируем cookie value (может быть URL encoded)
+        return decodeURIComponent(accessToken);
+      }
+
+      return null;
+    } catch (error) {
+      this.logger.error(`Error parsing cookies: ${error.message}`);
+      return null;
+    }
   }
 }
 

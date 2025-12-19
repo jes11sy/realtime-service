@@ -20,7 +20,7 @@ import { JoinRoomDto } from './dto/room.dto';
     origin: process.env.CORS_ORIGIN?.split(',') || true,
     credentials: true,
   },
-  transports: ['websocket'],
+  transports: ['websocket', 'polling'], // 🍪 polling поддерживает cookies лучше
   perMessageDeflate: {
     threshold: 1024, // Сжимать сообщения > 1KB
     zlibDeflateOptions: {
