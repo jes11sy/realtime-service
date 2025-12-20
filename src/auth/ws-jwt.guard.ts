@@ -3,23 +3,15 @@ import { JwtService } from '@nestjs/jwt';
 import { WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { ConfigService } from '@nestjs/config';
-import * as crypto from 'crypto';
 
 @Injectable()
 export class WsJwtGuard implements CanActivate {
   private readonly logger = new Logger(WsJwtGuard.name);
-  private readonly cookieSecret: string;
 
   constructor(
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) {
-    // Получаем секрет для подписи cookies (должен совпадать с auth-service)
-    this.cookieSecret = this.configService.get<string>('COOKIE_SECRET') || this.configService.get<string>('JWT_SECRET');
-    if (!this.cookieSecret) {
-      this.logger.error('⚠️ COOKIE_SECRET not configured! Cookie signature verification will fail.');
-    }
-  }
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
     try {
@@ -138,31 +130,13 @@ export class WsJwtGuard implements CanActivate {
         // Декодируем cookie value (может быть URL encoded)
         accessToken = decodeURIComponent(accessToken);
         
-        // 🔐 Проверяем подпись cookie (Fastify использует формат: value.signature)
-        if (accessToken.includes('.')) {
-          const lastDotIndex = accessToken.lastIndexOf('.');
-          const possibleSignature = accessToken.substring(lastDotIndex + 1);
-          
-          // Если после последней точки есть подпись (не JWT часть), проверяем
-          // JWT имеет 3 части, подпись cookie добавляется в конец
-          const tokenParts = accessToken.split('.');
-          if (tokenParts.length === 4) {
-            // Это signed cookie: jwt.part1.jwt.part2.jwt.part3.cookie_signature
-            const unsignedToken = tokenParts.slice(0, 3).join('.');
-            const cookieSignature = tokenParts[3];
-            
-            this.logger.debug(`🔐 Detected signed cookie, verifying signature...`);
-            
-            // Проверяем подпись
-            const isValid = this.verifyCookieSignature(unsignedToken, cookieSignature);
-            if (!isValid) {
-              this.logger.error(`🔐 Cookie signature verification failed!`);
-              return null;
-            }
-            
-            this.logger.debug(`🔐 Cookie signature verified successfully`);
-            accessToken = unsignedToken;
-          }
+        // Проверяем формат токена (JWT имеет 3 части)
+        const tokenParts = accessToken.split('.');
+        if (tokenParts.length === 4) {
+          // Это legacy signed cookie: jwt.header.jwt.payload.jwt.signature.cookie_signature
+          // Убираем 4-ю часть (cookie signature) — подпись cookies отключена
+          this.logger.debug(`🔧 Stripping legacy cookie signature (4 parts → 3)`);
+          accessToken = tokenParts.slice(0, 3).join('.');
         }
         
         // JWT должен иметь 3 части разделенные точками
@@ -185,28 +159,5 @@ export class WsJwtGuard implements CanActivate {
     }
   }
 
-  // 🔐 Проверка подписи cookie (Fastify @fastify/cookie format)
-  private verifyCookieSignature(value: string, signature: string): boolean {
-    try {
-      if (!this.cookieSecret) {
-        this.logger.warn(`🔐 No cookie secret configured, skipping signature verification`);
-        return true; // Если нет секрета, пропускаем проверку
-      }
-
-      // Fastify использует HMAC SHA256 для подписи
-      const expectedSignature = crypto
-        .createHmac('sha256', this.cookieSecret)
-        .update(value)
-        .digest('base64')
-        .replace(/=/g, '')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_');
-
-      return signature === expectedSignature;
-    } catch (error) {
-      this.logger.error(`🔐 Error verifying cookie signature: ${error.message}`);
-      return false;
-    }
-  }
 }
 
