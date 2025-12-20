@@ -50,6 +50,26 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   afterInit(server: Server) {
     this.logger.log('✅ WebSocket Gateway initialized');
     
+    // 🍪 Добавляем middleware для автоматической аутентификации через cookies
+    server.use(async (socket, next) => {
+      this.logger.log(`🔍 [Middleware] New connection attempt from ${socket.id}`);
+      this.logger.debug(`🔍 [Middleware] Handshake headers: ${JSON.stringify(Object.keys(socket.handshake?.headers || {}))}`);
+      this.logger.debug(`🔍 [Middleware] Cookie header present: ${socket.handshake?.headers?.cookie ? 'YES' : 'NO'}`);
+      
+      // Пробуем извлечь токен из cookies в handshake
+      const cookies = socket.handshake?.headers?.cookie;
+      if (cookies) {
+        this.logger.debug(`🍪 [Middleware] Found cookies in handshake`);
+        // Middleware просто пропускает соединение
+        // Аутентификация произойдет при вызове события 'authenticate'
+        next();
+      } else {
+        this.logger.warn(`⚠️ [Middleware] No cookies found in handshake`);
+        // Все равно пропускаем - аутентификация обязательна через событие
+        next();
+      }
+    });
+    
     // Subscribe to Redis channels for broadcasting between instances
     if (this.redisService.isRedisConnected()) {
       this.setupRedisSubscriptions();
@@ -93,7 +113,15 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   }
 
   handleConnection(client: Socket) {
-    this.logger.log(`Client connecting: ${client.id}`);
+    this.logger.log(`📡 Client connecting: ${client.id}`);
+    this.logger.debug(`🔍 [Connection] Headers: ${JSON.stringify(Object.keys(client.handshake?.headers || {}))}`);
+    this.logger.debug(`🔍 [Connection] Auth object: ${JSON.stringify(client.handshake?.auth || {})}`);
+    this.logger.debug(`🍪 [Connection] Has cookie header: ${client.handshake?.headers?.cookie ? 'YES' : 'NO'}`);
+    
+    if (client.handshake?.headers?.cookie) {
+      const cookieHeader = client.handshake.headers.cookie as string;
+      this.logger.debug(`🍪 [Connection] Cookie header (first 100 chars): ${cookieHeader.substring(0, 100)}...`);
+    }
     
     // Устанавливаем таймаут на аутентификацию
     const authTimeout = setTimeout(() => {
