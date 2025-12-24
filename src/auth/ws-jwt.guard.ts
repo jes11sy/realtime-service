@@ -128,11 +128,29 @@ export class WsJwtGuard implements CanActivate {
 
       this.logger.debug(`🍪 Parsed cookies keys: ${Object.keys(cookies).join(', ')}`);
 
-      // Проверяем access_token (может быть с префиксом __Host-)
-      let accessToken = cookies['access_token'] || cookies['__Host-access_token'];
+      // 🔍 Ищем access_token с разными суффиксами (для разных фронтендов)
+      const possibleCookieNames = [
+        'access_token_callcentre',  // callcentre.lead-schem.ru
+        'access_token_core',         // core.lead-schem.ru
+        'access_token_new',          // new.lead-schem.ru
+        'access_token_masters',      // lead-schem.ru (masters)
+        'access_token',              // fallback (legacy)
+        '__Host-access_token',       // legacy with prefix
+      ];
+
+      let accessToken: string | null = null;
+      let foundCookieName: string | null = null;
+
+      for (const cookieName of possibleCookieNames) {
+        if (cookies[cookieName]) {
+          accessToken = cookies[cookieName];
+          foundCookieName = cookieName;
+          break;
+        }
+      }
       
       if (accessToken) {
-        this.logger.debug(`🍪 Found access token (first 20 chars): ${accessToken.substring(0, 20)}...`);
+        this.logger.debug(`🍪 Found access token in cookie: ${foundCookieName} (first 20 chars): ${accessToken.substring(0, 20)}...`);
         
         // Декодируем cookie value (может быть URL encoded)
         accessToken = decodeURIComponent(accessToken);
@@ -154,11 +172,11 @@ export class WsJwtGuard implements CanActivate {
           return null;
         }
         
-        this.logger.debug(`🍪 Token successfully extracted and validated`);
+        this.logger.debug(`🍪 Token successfully extracted and validated from ${foundCookieName}`);
         return accessToken;
       }
 
-      this.logger.warn(`🍪 No access_token found in cookies`);
+      this.logger.warn(`🍪 No access_token found in cookies. Available keys: ${Object.keys(cookies).join(', ')}`);
       return null;
     } catch (error) {
       this.logger.error(`🍪 Error parsing cookies: ${error.message}`);
