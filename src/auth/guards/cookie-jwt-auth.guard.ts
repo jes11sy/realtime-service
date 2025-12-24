@@ -1,6 +1,6 @@
 import { Injectable, ExecutionContext, UnauthorizedException, Logger } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { CookieConfig } from '../../config/cookie.config';
+import { CookieConfig, getCookieName } from '../../config/cookie.config';
 import { Request } from 'express';
 
 /**
@@ -20,17 +20,31 @@ export class CookieJwtAuthGuard extends AuthGuard('jwt') {
     // Пытаемся получить токен из cookies (Express + cookie-parser)
     let cookieToken: string | null = null;
     
+    // Определяем имя cookie на основе origin
+    const origin = request.headers.origin || request.headers.referer;
+    const accessTokenName = getCookieName(CookieConfig.ACCESS_TOKEN_NAME, origin);
+    
     if (request.cookies && CookieConfig.ENABLE_COOKIE_SIGNING && request.signedCookies) {
-      // Подписанный cookie
-      cookieToken = request.signedCookies[CookieConfig.ACCESS_TOKEN_NAME] || null;
+      // Подписанный cookie с динамическим именем
+      cookieToken = request.signedCookies[accessTokenName] || null;
       
-      if (!cookieToken && request.cookies[CookieConfig.ACCESS_TOKEN_NAME]) {
+      // Fallback на базовое имя
+      if (!cookieToken) {
+        cookieToken = request.signedCookies[CookieConfig.ACCESS_TOKEN_NAME] || null;
+      }
+      
+      if (!cookieToken && (request.cookies[accessTokenName] || request.cookies[CookieConfig.ACCESS_TOKEN_NAME])) {
         this.logger.warn('⚠️ Invalid access token signature. Possible tampering.');
         throw new UnauthorizedException('Invalid access token signature. Possible tampering.');
       }
     } else if (request.cookies) {
-      // Неподписанный cookie
-      cookieToken = request.cookies[CookieConfig.ACCESS_TOKEN_NAME] || null;
+      // Неподписанный cookie с динамическим именем
+      cookieToken = request.cookies[accessTokenName] || null;
+      
+      // Fallback на базовое имя
+      if (!cookieToken) {
+        cookieToken = request.cookies[CookieConfig.ACCESS_TOKEN_NAME] || null;
+      }
     }
     
     // Если токен найден в cookie и нет Authorization header, добавляем его
