@@ -1,9 +1,11 @@
+/**
+ * ✅ FIX #160: Миграция с Express на Fastify для консистентности с другими сервисами
+ */
 import { NestFactory } from '@nestjs/core';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { ValidationPipe, Logger, LogLevel } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import * as compression from 'compression';
-import helmet from 'helmet';
 import { AllExceptionsFilter } from './filters/http-exception.filter';
 
 async function bootstrap() {
@@ -12,9 +14,16 @@ async function bootstrap() {
     ? ['error', 'warn', 'log']
     : ['error', 'warn', 'log', 'debug'];
 
-  const app = await NestFactory.create(AppModule, {
-    logger: logLevels,
-  });
+  // ✅ FIX #160: Используем Fastify вместо Express
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    new FastifyAdapter({
+      trustProxy: true, // Для работы за reverse proxy (nginx)
+    }),
+    {
+      logger: logLevels,
+    }
+  );
 
   const logger = new Logger('RealtimeService');
 
@@ -25,25 +34,8 @@ async function bootstrap() {
     throw new Error('CORS_ORIGIN is required');
   }
 
-  // ✅ HTTPS Enforcement в production (только для внешних запросов)
-  if (process.env.NODE_ENV === 'production') {
-    app.use((req, res, next) => {
-      // Пропускаем внутренние запросы между сервисами (Docker network)
-      const host = req.get('host') || '';
-      const isInternalRequest = host.includes('realtime-service') || 
-                                 host.startsWith('172.') || 
-                                 host.startsWith('10.') ||
-                                 host === 'localhost';
-      
-      if (!isInternalRequest && !req.secure && req.get('x-forwarded-proto') !== 'https') {
-        return res.redirect(301, 'https://' + host + req.url);
-      }
-      next();
-    });
-  }
-
-  // ✅ Security Headers с Helmet
-  app.use(helmet({
+  // ✅ Security Headers с @fastify/helmet
+  await app.register(require('@fastify/helmet'), {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -53,26 +45,23 @@ async function bootstrap() {
       },
     },
     crossOriginEmbedderPolicy: false,
-  }));
-
-  // ✅ Дополнительные security headers
-  app.use((req, res, next) => {
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    next();
   });
 
-  // 🍪 Cookie Parser для httpOnly cookies
-  const cookieParser = require('cookie-parser');
-  app.use(cookieParser(process.env.COOKIE_SECRET || process.env.JWT_SECRET));
-  logger.log('✅ Cookie parser registered');
+  // ✅ HTTP Compression с @fastify/compress
+  await app.register(require('@fastify/compress'), {
+    global: true,
+    encodings: ['gzip', 'deflate'],
+  });
 
-  // ✅ HTTP Compression
-  app.use(compression());
+  // 🍪 Cookie Parser с @fastify/cookie
+  await app.register(require('@fastify/cookie'), {
+    secret: process.env.COOKIE_SECRET || process.env.JWT_SECRET,
+    parseOptions: {},
+  });
+  logger.log('✅ Fastify cookie parser registered');
 
-  app.enableCors({
+  // ✅ CORS с @fastify/cors
+  await app.register(require('@fastify/cors'), {
     origin: allowedOrigins,
     credentials: true,
     allowedHeaders: [
@@ -83,6 +72,33 @@ async function bootstrap() {
       'X-Use-Cookies', // 🍪 Поддержка cookie mode
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
+
+  // ✅ HTTPS Enforcement в production (только для внешних запросов)
+  if (process.env.NODE_ENV === 'production') {
+    app.getHttpAdapter().getInstance().addHook('onRequest', (request, reply, done) => {
+      const host = request.headers.host || '';
+      const isInternalRequest = host.includes('realtime-service') || 
+                                 host.startsWith('172.') || 
+                                 host.startsWith('10.') ||
+                                 host === 'localhost';
+      
+      const proto = request.headers['x-forwarded-proto'];
+      if (!isInternalRequest && proto !== 'https') {
+        reply.redirect(301, 'https://' + host + request.url);
+        return;
+      }
+      done();
+    });
+  }
+
+  // ✅ Дополнительные security headers
+  app.getHttpAdapter().getInstance().addHook('onSend', (request, reply, payload, done) => {
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-XSS-Protection', '1; mode=block');
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    done();
   });
 
   // ✅ Глобальный обработчик ошибок
@@ -119,7 +135,7 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   const port = process.env.PORT || 5009;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0'); // Слушаем на всех интерфейсах для Docker
 
   const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
   const wsProtocol = process.env.NODE_ENV === 'production' ? 'wss' : 'ws';
@@ -128,6 +144,7 @@ async function bootstrap() {
   logger.log(`🔌 WebSocket server running on ${wsProtocol}://localhost:${port}`);
   logger.log(`📡 Redis: ${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || 6379}`);
   logger.log(`🛡️ Security: ${process.env.NODE_ENV === 'production' ? 'Production mode' : 'Development mode'}`);
+  logger.log(`⚡ Platform: Fastify (migrated from Express)`);
 
   // ✅ Graceful shutdown handlers
   const shutdownHandler = async (signal: string) => {
@@ -151,4 +168,3 @@ bootstrap().catch((err) => {
   logger.error('❌ Failed to start application:', err);
   process.exit(1);
 });
-

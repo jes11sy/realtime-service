@@ -42,13 +42,6 @@ export class WsJwtGuard implements CanActivate {
         throw new WsException('Missing authentication token');
       }
 
-      // ✅ FIX: Убираем cookie signature если токен имеет 4 части
-      const tokenParts = token.split('.');
-      if (tokenParts.length === 4 && token.startsWith('eyJ')) {
-        this.logger.debug(`🔧 Stripping legacy cookie signature from event token (4 parts → 3)`);
-        token = tokenParts.slice(0, 3).join('.');
-      }
-
       this.logger.debug(`🔍 [WsJwtGuard] Verifying token for client ${client.id} (first 30 chars): ${token.substring(0, 30)}...`);
       const payload = this.jwtService.verify(token);
       this.logger.debug(`🔍 [WsJwtGuard] Token verified successfully. Payload sub: ${payload.sub || payload.userId}, role: ${payload.role}`);
@@ -154,15 +147,6 @@ export class WsJwtGuard implements CanActivate {
         
         // Декодируем cookie value (может быть URL encoded)
         accessToken = decodeURIComponent(accessToken);
-        
-        // Проверяем формат токена (JWT имеет 3 части)
-        const tokenParts = accessToken.split('.');
-        if (tokenParts.length === 4) {
-          // Это legacy signed cookie: jwt.header.jwt.payload.jwt.signature.cookie_signature
-          // Убираем 4-ю часть (cookie signature) — подпись cookies отключена
-          this.logger.debug(`🔧 Stripping legacy cookie signature (4 parts → 3)`);
-          accessToken = tokenParts.slice(0, 3).join('.');
-        }
         
         // JWT должен иметь 3 части разделенные точками
         const parts = accessToken.split('.');

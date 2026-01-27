@@ -44,6 +44,9 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   private cleanupInterval: NodeJS.Timeout;
   private readonly ALLOWED_ROOMS = ['operators', 'directors'];
   private readonly AUTH_TIMEOUT = 10000; // 10 секунд
+  
+  // ✅ FIX: Уникальный ID инстанса для предотвращения дублирования событий в multi-instance setup
+  private readonly instanceId = `${process.env.HOSTNAME || 'local'}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
   constructor(private redisService: RedisService) {}
 
@@ -164,12 +167,21 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
         }
       }
       
-      // Уведомляем других пользователей
-      this.server.emit('user:offline', {
+      // ✅ FIX: Уведомляем только релевантные комнаты вместо ALL пользователей
+      // Директоры отслеживают операторов, операторы не нуждаются в этом событии
+      const userOfflineData = {
         userId: user.userId,
         role: user.role,
         timestamp: new Date().toISOString(),
-      });
+      };
+      
+      // Уведомляем директоров (они мониторят операторов)
+      this.server.to('directors').emit('user:offline', userOfflineData);
+      
+      // Уведомляем комнату того же типа роли (операторы видят друг друга)
+      if (user.role === 'operator' || user.role === 'callcentre_operator') {
+        this.server.to('operators').emit('user:offline', userOfflineData);
+      }
     } else {
       this.logger.log(`⚠️ [handleDisconnect] Client disconnected before authentication: ${client.id}`);
     }
@@ -230,12 +242,21 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       rooms: Array.from(client.rooms),
     });
 
-    // Уведомляем других пользователей
-    this.server.emit('user:online', {
+    // ✅ FIX: Уведомляем только релевантные комнаты вместо ALL пользователей
+    // Это предотвращает O(n²) сообщений при массовых подключениях
+    const userOnlineData = {
       userId: user.userId,
       role: user.role,
       timestamp: new Date().toISOString(),
-    });
+    };
+    
+    // Уведомляем директоров (они мониторят операторов)
+    this.server.to('directors').emit('user:online', userOnlineData);
+    
+    // Уведомляем комнату того же типа роли
+    if (user.role === 'operator' || user.role === 'callcentre_operator') {
+      this.server.to('operators').emit('user:online', userOnlineData);
+    }
 
     this.logger.log(`✅ [authenticate] Emitted authenticated event to client ${client.id}`);
 
@@ -382,7 +403,14 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   private setupRedisSubscriptions() {
     // Subscribe to broadcast channel
     this.redisService.subscribe('socket-broadcast', (message) => {
-      const { room, event, data } = message;
+      const { room, event, data, originInstanceId } = message;
+      
+      // ✅ FIX: Пропускаем сообщения от этого же инстанса чтобы избежать дублирования
+      // Инстанс уже эмитнул событие локально перед публикацией в Redis
+      if (originInstanceId === this.instanceId) {
+        this.logger.debug(`⏭️ Skipping Redis message from same instance: ${event}`);
+        return;
+      }
       
       if (room) {
         this.server.to(room).emit(event, data);
@@ -391,7 +419,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       }
     });
 
-    this.logger.log('✅ Redis subscriptions setup complete');
+    this.logger.log(`✅ Redis subscriptions setup complete (instanceId: ${this.instanceId})`);
   }
 
   // Public method to emit events from avito-service webhook
@@ -405,13 +433,15 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     this.server.emit(event, data);
     this.logger.debug(`✅ [emitAvitoEvent] Emitted ${event} to ${connectedCount} users via Socket.IO`);
     
-    // Also publish to Redis for horizontal scaling
+    // ✅ FIX: Публикуем в Redis с originInstanceId для предотвращения дублирования
+    // Другие инстансы эмитнут событие своим клиентам, но этот инстанс пропустит сообщение
     if (this.redisService.isRedisConnected()) {
       this.redisService.publish('socket-broadcast', {
         event,
         data,
+        originInstanceId: this.instanceId, // ✅ Маркер источника
       });
-      this.logger.debug(`✅ [emitAvitoEvent] Published ${event} to Redis`);
+      this.logger.debug(`✅ [emitAvitoEvent] Published ${event} to Redis (originInstanceId: ${this.instanceId})`);
     }
   }
 }

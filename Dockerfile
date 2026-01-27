@@ -9,10 +9,8 @@ COPY package*.json ./
 # Install ALL dependencies (including dev for build)
 RUN npm install && npm cache clean --force
 
-# Copy source code
+# Copy source code and build application
 COPY . .
-
-# Build application
 RUN npm run build
 
 # Production stage
