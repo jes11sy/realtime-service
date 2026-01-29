@@ -1,10 +1,10 @@
 import { Injectable, ExecutionContext, UnauthorizedException, Logger } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CookieConfig, getCookieName } from '../../config/cookie.config';
-import { Request } from 'express';
+import { FastifyRequest } from 'fastify';
 
 /**
- * 🍪 COOKIE JWT AUTH GUARD (для Express)
+ * 🍪 COOKIE JWT AUTH GUARD
  * 
  * Guard для извлечения JWT токенов из httpOnly cookies
  * Если токен найден в cookie, он добавляется в Authorization header
@@ -15,35 +15,40 @@ export class CookieJwtAuthGuard extends AuthGuard('jwt') {
   private readonly logger = new Logger(CookieJwtAuthGuard.name);
 
   canActivate(context: ExecutionContext) {
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<FastifyRequest>();
     
-    // Пытаемся получить токен из cookies (Express + cookie-parser)
+    // Пытаемся получить токен из cookies
     let cookieToken: string | null = null;
     
-    // Определяем имя cookie на основе origin
-    const origin = request.headers.origin || request.headers.referer;
-    const accessTokenName = getCookieName(CookieConfig.ACCESS_TOKEN_NAME, origin);
+    // Проверяем наличие cookies в request
+    const cookies = (request as any).cookies || (request.raw as any)?.cookies || null;
     
-    if (request.cookies && CookieConfig.ENABLE_COOKIE_SIGNING && request.signedCookies) {
-      // Подписанный cookie с динамическим именем
-      cookieToken = request.signedCookies[accessTokenName] || null;
+    if (cookies) {
+      // Определяем имя cookie на основе origin
+      const origin = request.headers.origin || request.headers.referer;
+      const accessTokenName = getCookieName(CookieConfig.ACCESS_TOKEN_NAME, origin);
+      
+      // Пробуем получить токен с динамическим именем
+      let rawCookie = cookies[accessTokenName];
       
       // Fallback на базовое имя
-      if (!cookieToken) {
-        cookieToken = request.signedCookies[CookieConfig.ACCESS_TOKEN_NAME] || null;
+      if (!rawCookie) {
+        rawCookie = cookies[CookieConfig.ACCESS_TOKEN_NAME];
       }
       
-      if (!cookieToken && (request.cookies[accessTokenName] || request.cookies[CookieConfig.ACCESS_TOKEN_NAME])) {
-        this.logger.warn('⚠️ Invalid access token signature. Possible tampering.');
-        throw new UnauthorizedException('Invalid access token signature. Possible tampering.');
-      }
-    } else if (request.cookies) {
-      // Неподписанный cookie с динамическим именем
-      cookieToken = request.cookies[accessTokenName] || null;
-      
-      // Fallback на базовое имя
-      if (!cookieToken) {
-        cookieToken = request.cookies[CookieConfig.ACCESS_TOKEN_NAME] || null;
+      if (rawCookie && rawCookie.startsWith('eyJ')) {
+        // ✅ JWT токен найден
+        const parts = rawCookie.split('.');
+        
+        if (parts.length === 3) {
+          // Стандартный JWT (header.payload.signature)
+          cookieToken = rawCookie;
+        } else if (parts.length === 4) {
+          // JWT + старая подпись cookie (миграция с signed cookies)
+          // Берём только первые 3 части
+          this.logger.debug('🔧 Stripping legacy cookie signature (4 parts → 3)');
+          cookieToken = parts.slice(0, 3).join('.');
+        }
       }
     }
     
