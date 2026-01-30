@@ -45,6 +45,7 @@ async function bootstrap() {
       },
     },
     crossOriginEmbedderPolicy: false,
+    frameguard: { action: 'deny' }, // X-Frame-Options: DENY
   });
 
   // ✅ HTTP Compression с @fastify/compress
