@@ -9,6 +9,7 @@ import { StatsModule } from './stats/stats.module';
 // import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './auth/auth.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { TelegramModule } from './telegram/telegram.module';
     BroadcastModule,
     StatsModule,
     TelegramModule,
+    NotificationsModule,
   ],
   providers: [
     {

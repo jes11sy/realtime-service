@@ -124,9 +124,109 @@ socket.on('user:offline', (user) => {
 - `POST /api/v1/broadcast/order-updated` - Broadcast обновления заказа
 - `POST /api/v1/broadcast/notification` - Broadcast уведомления
 
+### UI Notifications (In-App)
+**User-facing (требуют авторизации):**
+- `GET /api/v1/notifications` - Получить уведомления текущего пользователя
+- `GET /api/v1/notifications/unread-count` - Количество непрочитанных
+- `POST /api/v1/notifications/read` - Отметить как прочитанное
+- `POST /api/v1/notifications/read-all` - Отметить все как прочитанные
+- `DELETE /api/v1/notifications/:id` - Удалить уведомление
+- `DELETE /api/v1/notifications` - Очистить все уведомления
+
+**Internal API (для других сервисов):**
+- `POST /api/v1/notifications/internal/create` - Создать уведомление
+- `POST /api/v1/notifications/internal/notify-users` - Уведомить нескольких пользователей
+- `POST /api/v1/notifications/internal/notify-room` - Уведомить комнату
+- `POST /api/v1/notifications/internal/operator/call` - Уведомить КЦ о звонке
+- `POST /api/v1/notifications/internal/operator/order` - Уведомить КЦ о заказе
+- `POST /api/v1/notifications/internal/directors/city` - Уведомить директоров города
+- `POST /api/v1/notifications/internal/master` - Уведомить мастера
+- `POST /api/v1/notifications/internal/system` - Системное уведомление по роли
+
 ### Stats
 - `GET /api/v1/stats/connections` - Активные подключения
 - `GET /api/v1/stats/rooms` - Информация о комнатах
+
+## UI Notifications System
+
+### Типы уведомлений по ролям
+
+**КЦ (operator):**
+- `call_incoming` - входящий звонок
+- `call_missed` - пропущенный звонок
+- `order_created` - заказ создан
+- `order_edited` - заказ изменён
+
+**Директор:**
+- `order_new` - новый заказ в городе
+- `order_accepted` - мастер принял заказ
+- `order_rescheduled` - заказ перенесён
+- `order_rejected` - незаказ
+- `order_closed` - заказ закрыт
+
+**Мастер:**
+- `master_assigned` - назначен на заказ
+- `master_order_rescheduled` - заказ перенесён
+- `master_order_rejected` - заказ отменён
+
+### Хранение в Redis
+- Sorted Set: `ui:notifications:{userId}` (score = timestamp)
+- Counter: `ui:notifications:unread:{userId}`
+- TTL: 24 часа
+- Лимит: 50 уведомлений на пользователя
+
+### WebSocket Events
+```javascript
+// Новое уведомление
+socket.on('notification:new', (notification) => {
+  // { id, type, title, message, orderId, data, read, createdAt }
+});
+
+// Уведомление прочитано
+socket.on('notification:read', ({ id }) => {});
+
+// Все прочитаны
+socket.on('notification:all_read', () => {});
+
+// Все очищены
+socket.on('notification:cleared', () => {});
+```
+
+### Интеграция с orders-service
+
+```typescript
+// Уведомить директоров о новом заказе
+await axios.post('http://realtime-service:5009/api/v1/notifications/internal/directors/city', {
+  city: 'Саратов',
+  notificationType: 'order_new',
+  orderId: 123,
+  clientName: 'Иван Иванов',
+});
+
+// Уведомить мастера о назначении
+await axios.post('http://realtime-service:5009/api/v1/notifications/internal/master', {
+  odooMasterId: 456,
+  notificationType: 'master_assigned',
+  orderId: 123,
+  clientName: 'Иван Иванов',
+  address: 'ул. Пушкина, д. 10',
+  dateMeeting: '2024-01-15T10:00:00Z',
+});
+```
+
+### Интеграция с calls-service
+
+```typescript
+// Уведомить оператора о входящем звонке
+await axios.post('http://realtime-service:5009/api/v1/notifications/internal/operator/call', {
+  operatorId: 1,
+  callId: 789,
+  phoneClient: '+79001234567',
+  callDirection: 'inbound',
+  city: 'Саратов',
+  avitoName: 'Ремонт техники',
+});
+```
 
 ## Environment Variables
 
