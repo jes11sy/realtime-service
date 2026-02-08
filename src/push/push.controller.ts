@@ -10,6 +10,8 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { CookieJwtAuthGuard } from '../auth/guards/cookie-jwt-auth.guard';
 import { PushService, PushSubscription, UserPushSettings } from './push.service';
 
@@ -21,22 +23,51 @@ interface AuthRequest {
   };
 }
 
+// DTO для ключей подписки
+class PushKeysDto {
+  @IsString()
+  @IsNotEmpty()
+  p256dh: string;
+
+  @IsString()
+  @IsNotEmpty()
+  auth: string;
+}
+
+// DTO для объекта подписки
+class PushSubscriptionDto {
+  @IsString()
+  @IsNotEmpty()
+  endpoint: string;
+
+  @ValidateNested()
+  @Type(() => PushKeysDto)
+  keys: PushKeysDto;
+
+  @IsOptional()
+  expirationTime?: number | null;
+}
+
+// Основной DTO для подписки
 class SubscribeDto {
-  subscription: {
-    endpoint: string;
-    keys: {
-      p256dh: string;
-      auth: string;
-    };
-  };
+  @ValidateNested()
+  @Type(() => PushSubscriptionDto)
+  subscription: PushSubscriptionDto;
 }
 
 class UnsubscribeDto {
+  @IsString()
+  @IsNotEmpty()
   endpoint: string;
 }
 
 class UpdateSettingsDto {
+  @IsOptional()
+  @IsBoolean()
   callIncoming?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   callMissed?: boolean;
 }
 
