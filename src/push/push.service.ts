@@ -112,7 +112,7 @@ export class PushService implements OnModuleInit {
       // Если указан endpoint, проверяем что он совпадает
       if (endpoint) {
         const existing = await client.get(key);
-        if (existing) {
+        if (existing && typeof existing === 'string') {
           const sub = JSON.parse(existing) as PushSubscription;
           if (sub.endpoint !== endpoint) {
             return false; // Не тот endpoint
@@ -140,7 +140,7 @@ export class PushService implements OnModuleInit {
 
     try {
       const data = await client.get(key);
-      if (!data) return null;
+      if (!data || typeof data !== 'string') return null;
       return JSON.parse(data) as PushSubscription;
     } catch (error) {
       this.logger.error(`Failed to get subscription: ${error.message}`);
@@ -165,7 +165,7 @@ export class PushService implements OnModuleInit {
 
     try {
       const data = await client.get(key);
-      if (!data) return defaultSettings;
+      if (!data || typeof data !== 'string') return defaultSettings;
       
       const settings = JSON.parse(data) as UserPushSettings;
       // Проверяем есть ли подписка
