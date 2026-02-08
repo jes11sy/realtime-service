@@ -298,8 +298,8 @@ export class PushService implements OnModuleInit {
    */
   async sendTestPush(userId: number): Promise<boolean> {
     return this.sendPush(userId, {
-      title: 'Тестовое уведомление',
-      body: 'Push-уведомления работают!',
+      title: 'LEADS CREATE',
+      body: 'Уведомления включены',
       type: 'test',
       requireInteraction: false,
     });
