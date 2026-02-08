@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../redis/redis.service';
 import * as webpush from 'web-push';
+import * as crypto from 'crypto';
 
 export interface PushSubscription {
   endpoint: string;
@@ -35,6 +36,7 @@ export interface PushPayload {
 export class PushService implements OnModuleInit {
   private readonly logger = new Logger(PushService.name);
   private readonly SUBSCRIPTION_TTL = 30 * 24 * 60 * 60; // 30 дней
+  private readonly MAX_SUBSCRIPTIONS_PER_USER = 5; // Максимум устройств
   private isConfigured = false;
 
   constructor(
@@ -62,7 +64,14 @@ export class PushService implements OnModuleInit {
   }
 
   /**
-   * Сохранить подписку пользователя
+   * Генерирует короткий ID для endpoint (для использования как ключ в hash)
+   */
+  private getEndpointId(endpoint: string): string {
+    return crypto.createHash('md5').update(endpoint).digest('hex').slice(0, 12);
+  }
+
+  /**
+   * Сохранить подписку пользователя (поддержка нескольких устройств)
    */
   async saveSubscription(userId: number, subscription: PushSubscription): Promise<boolean> {
     const client = this.redisService.getPubClient();
@@ -71,13 +80,25 @@ export class PushService implements OnModuleInit {
       return false;
     }
 
-    const key = `push:subscription:${userId}`;
+    const key = `push:subscriptions:${userId}`;
     const settingsKey = `push:settings:${userId}`;
+    const endpointId = this.getEndpointId(subscription.endpoint);
 
     try {
-      // Сохраняем подписку
-      await client.set(key, JSON.stringify(subscription));
+      // Сохраняем подписку в hash (endpoint_id -> subscription)
+      await client.hSet(key, endpointId, JSON.stringify(subscription));
       await client.expire(key, this.SUBSCRIPTION_TTL);
+
+      // Проверяем количество подписок, удаляем старые если превышен лимит
+      const allKeys = await client.hKeys(key);
+      if (allKeys.length > this.MAX_SUBSCRIPTIONS_PER_USER) {
+        // Удаляем первые (самые старые) ключи
+        const keysToRemove = allKeys.slice(0, allKeys.length - this.MAX_SUBSCRIPTIONS_PER_USER);
+        for (const k of keysToRemove) {
+          await client.hDel(key, k);
+        }
+        this.logger.log(`Removed ${keysToRemove.length} old subscriptions for user ${userId}`);
+      }
 
       // Инициализируем настройки если их нет
       const existingSettings = await client.get(settingsKey);
@@ -91,7 +112,8 @@ export class PushService implements OnModuleInit {
         await client.expire(settingsKey, this.SUBSCRIPTION_TTL);
       }
 
-      this.logger.log(`Saved push subscription for user ${userId}`);
+      const totalSubs = await client.hLen(key);
+      this.logger.log(`Saved push subscription for user ${userId} (total devices: ${totalSubs})`);
       return true;
     } catch (error) {
       this.logger.error(`Failed to save subscription: ${error.message}`);
@@ -106,22 +128,19 @@ export class PushService implements OnModuleInit {
     const client = this.redisService.getPubClient();
     if (!client) return false;
 
-    const key = `push:subscription:${userId}`;
+    const key = `push:subscriptions:${userId}`;
 
     try {
-      // Если указан endpoint, проверяем что он совпадает
       if (endpoint) {
-        const existing = await client.get(key);
-        if (existing && typeof existing === 'string') {
-          const sub = JSON.parse(existing) as PushSubscription;
-          if (sub.endpoint !== endpoint) {
-            return false; // Не тот endpoint
-          }
-        }
+        // Удаляем конкретную подписку по endpoint
+        const endpointId = this.getEndpointId(endpoint);
+        await client.hDel(key, endpointId);
+        this.logger.log(`Removed push subscription ${endpointId} for user ${userId}`);
+      } else {
+        // Удаляем все подписки
+        await client.del(key);
+        this.logger.log(`Removed all push subscriptions for user ${userId}`);
       }
-
-      await client.del(key);
-      this.logger.log(`Removed push subscription for user ${userId}`);
       return true;
     } catch (error) {
       this.logger.error(`Failed to remove subscription: ${error.message}`);
@@ -130,22 +149,31 @@ export class PushService implements OnModuleInit {
   }
 
   /**
-   * Получить подписку пользователя
+   * Получить все подписки пользователя
    */
-  async getSubscription(userId: number): Promise<PushSubscription | null> {
+  async getAllSubscriptions(userId: number): Promise<PushSubscription[]> {
     const client = this.redisService.getPubClient();
-    if (!client) return null;
+    if (!client) return [];
 
-    const key = `push:subscription:${userId}`;
+    const key = `push:subscriptions:${userId}`;
 
     try {
-      const data = await client.get(key);
-      if (!data || typeof data !== 'string') return null;
-      return JSON.parse(data) as PushSubscription;
+      const data = await client.hGetAll(key);
+      if (!data || Object.keys(data).length === 0) return [];
+      
+      return Object.values(data).map(v => JSON.parse(v) as PushSubscription);
     } catch (error) {
-      this.logger.error(`Failed to get subscription: ${error.message}`);
-      return null;
+      this.logger.error(`Failed to get subscriptions: ${error.message}`);
+      return [];
     }
+  }
+
+  /**
+   * Получить первую подписку (для совместимости)
+   */
+  async getSubscription(userId: number): Promise<PushSubscription | null> {
+    const subs = await this.getAllSubscriptions(userId);
+    return subs.length > 0 ? subs[0] : null;
   }
 
   /**
@@ -168,9 +196,9 @@ export class PushService implements OnModuleInit {
       if (!data || typeof data !== 'string') return defaultSettings;
       
       const settings = JSON.parse(data) as UserPushSettings;
-      // Проверяем есть ли подписка
-      const subscription = await this.getSubscription(userId);
-      settings.enabled = !!subscription;
+      // Проверяем есть ли хотя бы одна подписка
+      const subscriptions = await this.getAllSubscriptions(userId);
+      settings.enabled = subscriptions.length > 0;
       
       return settings;
     } catch (error) {
@@ -203,7 +231,7 @@ export class PushService implements OnModuleInit {
   }
 
   /**
-   * Отправить push-уведомление пользователю
+   * Отправить push-уведомление пользователю (на все устройства)
    */
   async sendPush(userId: number, payload: PushPayload): Promise<boolean> {
     if (!this.isConfigured) {
@@ -211,9 +239,9 @@ export class PushService implements OnModuleInit {
       return false;
     }
 
-    const subscription = await this.getSubscription(userId);
-    if (!subscription) {
-      this.logger.warn(`No push subscription found in Redis for user ${userId}`);
+    const subscriptions = await this.getAllSubscriptions(userId);
+    if (subscriptions.length === 0) {
+      this.logger.warn(`No push subscriptions found for user ${userId}`);
       return false;
     }
 
@@ -236,34 +264,44 @@ export class PushService implements OnModuleInit {
       }
     }
 
-    try {
-      const pushPayload = JSON.stringify({
-        title: payload.title,
-        body: payload.body,
-        icon: payload.icon || '/img/logo/logo_v2.png',
-        badge: payload.badge || '/img/logo/favicon.png',
-        tag: payload.tag || payload.type || 'default',
-        type: payload.type,
-        url: payload.url || '/',
-        orderId: payload.orderId,
-        data: payload.data,
-        requireInteraction: payload.requireInteraction ?? true,
-        actions: payload.actions,
-      });
+    const pushPayload = JSON.stringify({
+      title: payload.title,
+      body: payload.body,
+      icon: payload.icon || '/img/logo/logo_v2.png',
+      badge: payload.badge || '/img/logo/favicon.png',
+      tag: payload.tag || payload.type || 'default',
+      type: payload.type,
+      url: payload.url || '/',
+      orderId: payload.orderId,
+      data: payload.data,
+    });
 
-      await webpush.sendNotification(subscription, pushPayload);
-      this.logger.log(`Push sent to user ${userId}: ${payload.title}`);
-      return true;
-    } catch (error: any) {
-      // Если подписка невалидна (410 Gone или 404), удаляем её
-      if (error.statusCode === 410 || error.statusCode === 404) {
-        this.logger.warn(`Push subscription expired for user ${userId}, removing`);
-        await this.removeSubscription(userId);
-      } else {
-        this.logger.error(`Failed to send push to user ${userId}: ${error.message}`);
+    // Отправляем на все устройства
+    let successCount = 0;
+    const failedEndpoints: string[] = [];
+
+    for (const subscription of subscriptions) {
+      try {
+        await webpush.sendNotification(subscription, pushPayload);
+        successCount++;
+      } catch (error: any) {
+        // Если подписка невалидна (410 Gone или 404), помечаем для удаления
+        if (error.statusCode === 410 || error.statusCode === 404) {
+          failedEndpoints.push(subscription.endpoint);
+        } else {
+          this.logger.error(`Failed to send push to endpoint: ${error.message}`);
+        }
       }
-      return false;
     }
+
+    // Удаляем невалидные подписки
+    for (const endpoint of failedEndpoints) {
+      await this.removeSubscription(userId, endpoint);
+      this.logger.warn(`Removed expired subscription for user ${userId}`);
+    }
+
+    this.logger.log(`Push sent to user ${userId}: ${payload.title} (${successCount}/${subscriptions.length} devices)`);
+    return successCount > 0;
   }
 
   /**

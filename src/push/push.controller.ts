@@ -87,11 +87,15 @@ export class PushController {
   ) {
     const userId = req.user.odoo_id || req.user.sub;
     
+    // Логируем для отладки
+    console.log(`[Push] Subscribe request: userId=${userId}, odoo_id=${req.user.odoo_id}, sub=${req.user.sub}, endpoint=${dto.subscription.endpoint.slice(-30)}`);
+    
     const success = await this.pushService.saveSubscription(userId, dto.subscription);
     
     return {
       success,
       message: success ? 'Подписка сохранена' : 'Ошибка сохранения подписки',
+      userId, // Возвращаем для отладки
     };
   }
 
@@ -147,11 +151,14 @@ export class PushController {
   async sendTest(@Req() req: AuthRequest) {
     const userId = req.user.odoo_id || req.user.sub;
     
+    console.log(`[Push] Test request: userId=${userId}, odoo_id=${req.user.odoo_id}, sub=${req.user.sub}`);
+    
     const success = await this.pushService.sendTestPush(userId);
     
     return {
       success,
       message: success ? 'Тестовое уведомление отправлено' : 'Не удалось отправить (нет подписки или push отключен)',
+      userId, // Для отладки
     };
   }
 }
