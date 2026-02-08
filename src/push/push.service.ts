@@ -207,28 +207,33 @@ export class PushService implements OnModuleInit {
    */
   async sendPush(userId: number, payload: PushPayload): Promise<boolean> {
     if (!this.isConfigured) {
-      this.logger.debug('Push not configured, skipping');
+      this.logger.warn(`Push not configured (VAPID keys missing), skipping push for user ${userId}`);
       return false;
     }
 
     const subscription = await this.getSubscription(userId);
     if (!subscription) {
-      this.logger.debug(`No push subscription for user ${userId}`);
+      this.logger.warn(`No push subscription found in Redis for user ${userId}`);
       return false;
     }
 
     // Проверяем настройки
     const settings = await this.getSettings(userId);
     if (!settings.enabled) {
+      this.logger.warn(`Push disabled in settings for user ${userId}`);
       return false;
     }
 
-    // Проверяем тип уведомления
-    if (payload.type === 'call_incoming' && !settings.callIncoming) {
-      return false;
-    }
-    if (payload.type === 'call_missed' && !settings.callMissed) {
-      return false;
+    // Проверяем тип уведомления (пропускаем проверку для тестовых)
+    if (payload.type !== 'test') {
+      if (payload.type === 'call_incoming' && !settings.callIncoming) {
+        this.logger.warn(`call_incoming push disabled for user ${userId}`);
+        return false;
+      }
+      if (payload.type === 'call_missed' && !settings.callMissed) {
+        this.logger.warn(`call_missed push disabled for user ${userId}`);
+        return false;
+      }
     }
 
     try {
