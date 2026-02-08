@@ -375,8 +375,8 @@ export class NotificationsService {
     avitoName?: string,
   ): Promise<UINotification | null> {
     const titles = {
-      call_incoming: '📞 Входящий звонок',
-      call_missed: '📵 Пропущенный звонок',
+      call_incoming: 'Входящий звонок',
+      call_missed: 'Пропущенный звонок',
     };
 
     let message = clientName ? `${clientName} (${phone})` : phone;
