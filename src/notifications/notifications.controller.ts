@@ -251,6 +251,34 @@ export class NotificationsController {
   }
 
   /**
+   * КЦ: Уведомление о звонке всем операторам (internal)
+   * Используется когда оператор не определён
+   */
+  @Post('internal/operators/call')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Уведомить всех операторов о звонке (internal API)' })
+  @ApiResponse({ status: 200, description: 'Уведомления отправлены' })
+  async notifyAllOperatorsCall(@Body() dto: Omit<NotifyOperatorCallDto, 'operatorId'>) {
+    const callType = dto.callType || 'call_incoming';
+    const phone = dto.phoneClient || dto.phone || 'Неизвестный номер';
+    
+    // Отправляем в комнату operators
+    await this.notificationsService.notifyRoom(
+      'operators',
+      callType,
+      callType === 'call_missed' ? 'Пропущенный звонок' : 'Входящий звонок',
+      `${phone}${dto.city ? ` • ${dto.city}` : ''}${dto.avitoName ? ` • ${dto.avitoName}` : ''}`,
+      undefined,
+      { phone, callId: dto.callId, city: dto.city, avitoName: dto.avitoName },
+    );
+
+    return {
+      success: true,
+      message: 'Call notification broadcasted to all operators',
+    };
+  }
+
+  /**
    * КЦ: Уведомление о заказе (internal)
    */
   @Post('internal/operator/order')
