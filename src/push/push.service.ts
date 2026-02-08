@@ -267,7 +267,7 @@ export class PushService implements OnModuleInit {
     const pushPayload = JSON.stringify({
       title: payload.title,
       body: payload.body,
-      icon: payload.icon || '/img/logo/logo_v2.png',
+      icon: payload.icon || '/img/logo/pwa_logo.png',
       badge: payload.badge || '/img/logo/favicon.png',
       tag: payload.tag || payload.type || 'default',
       type: payload.type,
