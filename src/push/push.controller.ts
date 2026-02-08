@@ -17,8 +17,8 @@ import { PushService, PushSubscription, UserPushSettings } from './push.service'
 
 interface AuthRequest {
   user: {
-    sub: number;
-    odoo_id: number;
+    userId: number;
+    login: string;
     role: string;
   };
 }
@@ -85,17 +85,16 @@ export class PushController {
     @Req() req: AuthRequest,
     @Body() dto: SubscribeDto,
   ) {
-    const userId = req.user.odoo_id || req.user.sub;
+    const userId = req.user.userId;
     
-    // Логируем для отладки
-    console.log(`[Push] Subscribe request: userId=${userId}, odoo_id=${req.user.odoo_id}, sub=${req.user.sub}, endpoint=${dto.subscription.endpoint.slice(-30)}`);
+    console.log(`[Push] Subscribe: userId=${userId}, login=${req.user.login}`);
     
     const success = await this.pushService.saveSubscription(userId, dto.subscription);
     
     return {
       success,
       message: success ? 'Подписка сохранена' : 'Ошибка сохранения подписки',
-      userId, // Возвращаем для отладки
+      userId,
     };
   }
 
@@ -106,7 +105,7 @@ export class PushController {
     @Req() req: AuthRequest,
     @Body() dto: UnsubscribeDto,
   ) {
-    const userId = req.user.odoo_id || req.user.sub;
+    const userId = req.user.userId;
     
     const success = await this.pushService.removeSubscription(userId, dto.endpoint);
     
@@ -119,7 +118,7 @@ export class PushController {
   @Get('settings')
   @ApiOperation({ summary: 'Получить настройки push-уведомлений' })
   async getSettings(@Req() req: AuthRequest) {
-    const userId = req.user.odoo_id || req.user.sub;
+    const userId = req.user.userId;
     
     const settings = await this.pushService.getSettings(userId);
     
@@ -135,7 +134,7 @@ export class PushController {
     @Req() req: AuthRequest,
     @Body() dto: UpdateSettingsDto,
   ) {
-    const userId = req.user.odoo_id || req.user.sub;
+    const userId = req.user.userId;
     
     const success = await this.pushService.updateSettings(userId, dto);
     
@@ -149,16 +148,16 @@ export class PushController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Отправить тестовое push-уведомление' })
   async sendTest(@Req() req: AuthRequest) {
-    const userId = req.user.odoo_id || req.user.sub;
+    const userId = req.user.userId;
     
-    console.log(`[Push] Test request: userId=${userId}, odoo_id=${req.user.odoo_id}, sub=${req.user.sub}`);
+    console.log(`[Push] Test: userId=${userId}, login=${req.user.login}`);
     
     const success = await this.pushService.sendTestPush(userId);
     
     return {
       success,
       message: success ? 'Тестовое уведомление отправлено' : 'Не удалось отправить (нет подписки или push отключен)',
-      userId, // Для отладки
+      userId,
     };
   }
 }
