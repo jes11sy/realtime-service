@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '../redis/redis.service';
 import { EventsGateway } from '../events/events.gateway';
 import { NotificationType } from './dto/notification.dto';
+import { PushService } from '../push/push.service';
 
 export interface UINotification {
   id: string;
@@ -32,6 +33,7 @@ export class NotificationsService {
   constructor(
     private readonly redisService: RedisService,
     private readonly eventsGateway: EventsGateway,
+    private readonly pushService: PushService,
   ) {}
 
   /**
@@ -382,6 +384,11 @@ export class NotificationsService {
     let message = clientName ? `${clientName} (${phone})` : phone;
     if (city) message += ` • ${city}`;
     if (avitoName) message += ` • ${avitoName}`;
+
+    // Отправляем push-уведомление
+    this.pushService.sendCallPush(operatorId, callType, phone, clientName).catch(err => {
+      this.logger.warn(`Failed to send push for call: ${err.message}`);
+    });
 
     return this.createNotification({
       userId: operatorId,

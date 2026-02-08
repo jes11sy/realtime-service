@@ -10,6 +10,7 @@ import { StatsModule } from './stats/stats.module';
 import { AuthModule } from './auth/auth.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PushModule } from './push/push.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     StatsModule,
     TelegramModule,
     NotificationsModule,
+    PushModule,
   ],
   providers: [
     {

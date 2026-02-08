@@ -37,13 +37,15 @@
     "redis": "^5.0.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.2.1",
     "@nestjs/schematics": "^10.0.3",
     "@types/node": "^20.10.5",
     "@types/passport-jwt": "^3.0.13",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "@types/web-push": "^3.6.4"
   }
 }
