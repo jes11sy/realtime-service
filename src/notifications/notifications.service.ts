@@ -134,7 +134,7 @@ export class NotificationsService {
 
     try {
       const count = await client.get(unreadKey);
-      return count ? parseInt(count, 10) : 0;
+      return count && typeof count === 'string' ? parseInt(count, 10) : 0;
     } catch (error) {
       this.logger.error(`Failed to get unread count: ${error.message}`);
       return 0;
