@@ -273,6 +273,11 @@ export class NotifyMasterDto {
   @IsString()
   address?: string;
 
+  @ApiPropertyOptional({ description: 'Город' })
+  @IsOptional()
+  @IsString()
+  city?: string;
+
   @ApiPropertyOptional({ description: 'Дата встречи' })
   @IsOptional()
   @IsString()

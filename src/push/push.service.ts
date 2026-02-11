@@ -489,6 +489,7 @@ export class PushService implements OnModuleInit {
     data?: {
       clientName?: string;
       address?: string;
+      city?: string;
       dateMeeting?: string;
       newDate?: string;
       reason?: string;
@@ -504,7 +505,15 @@ export class PushService implements OnModuleInit {
     let body = '';
     switch (notificationType) {
       case 'order_assigned':
-        body = data?.address || data?.clientName || 'Новый заказ';
+        // Формируем детальное сообщение: Город, Адрес, Дата
+        const parts: string[] = [];
+        if (data?.city) parts.push(data.city);
+        if (data?.address) parts.push(data.address);
+        if (data?.dateMeeting) {
+          const date = new Date(data.dateMeeting);
+          parts.push(date.toLocaleDateString('ru-RU') + ' ' + date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }));
+        }
+        body = parts.length > 0 ? parts.join('\n') : (data?.clientName || 'Новый заказ');
         break;
       case 'order_rescheduled':
         if (data?.newDate) {

@@ -491,6 +491,7 @@ export class NotificationsService {
     options?: {
       clientName?: string;
       address?: string;
+      city?: string;
       dateMeeting?: string;
       newDate?: string;
       reason?: string;
@@ -507,8 +508,12 @@ export class NotificationsService {
     
     if (notificationType === 'master_assigned') {
       if (options?.clientName) message += ` - ${options.clientName}`;
-      if (options?.address) message += `\n📍 ${options.address}`;
-      if (options?.dateMeeting) message += `\n🗓 ${options.dateMeeting}`;
+      if (options?.city) message += `\n📍 ${options.city}`;
+      if (options?.address) message += ` ${options.address}`;
+      if (options?.dateMeeting) {
+        const date = new Date(options.dateMeeting);
+        message += `\n🗓 ${date.toLocaleDateString('ru-RU')} ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+      }
     } else if (notificationType === 'master_order_rescheduled') {
       if (options?.newDate) message += `\nНовая дата: ${options.newDate}`;
     } else if (notificationType === 'master_order_rejected') {
