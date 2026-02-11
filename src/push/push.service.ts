@@ -342,4 +342,206 @@ export class PushService implements OnModuleInit {
       requireInteraction: false,
     });
   }
+
+  // ============ MASTER PUSH METHODS ============
+
+  /**
+   * Сохранить подписку мастера (по odooMasterId)
+   */
+  async saveMasterSubscription(odooMasterId: number, subscription: PushSubscription): Promise<boolean> {
+    const client = this.redisService.getPubClient();
+    if (!client) {
+      this.logger.warn('Redis not connected');
+      return false;
+    }
+
+    const key = `push:master:subscriptions:${odooMasterId}`;
+    const endpointId = this.getEndpointId(subscription.endpoint);
+
+    try {
+      await client.hSet(key, endpointId, JSON.stringify(subscription));
+      await client.expire(key, this.SUBSCRIPTION_TTL);
+
+      // Проверяем количество подписок
+      const allKeys = await client.hKeys(key);
+      if (allKeys.length > this.MAX_SUBSCRIPTIONS_PER_USER) {
+        const keysToRemove = allKeys.slice(0, allKeys.length - this.MAX_SUBSCRIPTIONS_PER_USER);
+        for (const k of keysToRemove) {
+          await client.hDel(key, k);
+        }
+        this.logger.log(`Removed ${keysToRemove.length} old subscriptions for master ${odooMasterId}`);
+      }
+
+      const totalSubs = await client.hLen(key);
+      this.logger.log(`Saved push subscription for master ${odooMasterId} (total devices: ${totalSubs})`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Failed to save master subscription: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Удалить подписку мастера
+   */
+  async removeMasterSubscription(odooMasterId: number, endpoint?: string): Promise<boolean> {
+    const client = this.redisService.getPubClient();
+    if (!client) return false;
+
+    const key = `push:master:subscriptions:${odooMasterId}`;
+
+    try {
+      if (endpoint) {
+        const endpointId = this.getEndpointId(endpoint);
+        await client.hDel(key, endpointId);
+        this.logger.log(`Removed push subscription ${endpointId} for master ${odooMasterId}`);
+      } else {
+        await client.del(key);
+        this.logger.log(`Removed all push subscriptions for master ${odooMasterId}`);
+      }
+      return true;
+    } catch (error) {
+      this.logger.error(`Failed to remove master subscription: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Получить все подписки мастера
+   */
+  async getMasterSubscriptions(odooMasterId: number): Promise<PushSubscription[]> {
+    const client = this.redisService.getPubClient();
+    if (!client) return [];
+
+    const key = `push:master:subscriptions:${odooMasterId}`;
+
+    try {
+      const data = await client.hGetAll(key);
+      if (!data || Object.keys(data).length === 0) return [];
+      
+      return Object.values(data).map(v => JSON.parse(v) as PushSubscription);
+    } catch (error) {
+      this.logger.error(`Failed to get master subscriptions: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Отправить push мастеру (на все его устройства)
+   */
+  async sendMasterPush(odooMasterId: number, payload: PushPayload): Promise<boolean> {
+    if (!this.isConfigured) {
+      this.logger.warn(`Push not configured, skipping push for master ${odooMasterId}`);
+      return false;
+    }
+
+    const subscriptions = await this.getMasterSubscriptions(odooMasterId);
+    if (subscriptions.length === 0) {
+      this.logger.debug(`No push subscriptions found for master ${odooMasterId}`);
+      return false;
+    }
+
+    const pushPayload = JSON.stringify({
+      title: payload.title,
+      body: payload.body,
+      icon: payload.icon || '/images/images/pwa_light.png',
+      badge: payload.badge || '/images/images/favicon.png',
+      tag: payload.tag || payload.type || 'default',
+      type: payload.type,
+      url: payload.url || '/orders',
+      orderId: payload.orderId,
+      data: payload.data,
+    });
+
+    let successCount = 0;
+    const failedEndpoints: string[] = [];
+
+    for (const subscription of subscriptions) {
+      try {
+        await webpush.sendNotification(subscription, pushPayload);
+        successCount++;
+      } catch (error: any) {
+        if (error.statusCode === 410 || error.statusCode === 404) {
+          failedEndpoints.push(subscription.endpoint);
+        } else {
+          this.logger.error(`Failed to send push to master endpoint: ${error.message}`);
+        }
+      }
+    }
+
+    // Удаляем невалидные подписки
+    for (const endpoint of failedEndpoints) {
+      await this.removeMasterSubscription(odooMasterId, endpoint);
+      this.logger.warn(`Removed expired subscription for master ${odooMasterId}`);
+    }
+
+    this.logger.log(`Push sent to master ${odooMasterId}: ${payload.title} (${successCount}/${subscriptions.length} devices)`);
+    return successCount > 0;
+  }
+
+  /**
+   * Отправить push мастеру о заказе
+   */
+  async sendMasterOrderPush(
+    odooMasterId: number,
+    notificationType: 'order_assigned' | 'order_rescheduled' | 'order_cancelled' | 'order_reassigned',
+    orderId: number,
+    data?: {
+      clientName?: string;
+      address?: string;
+      dateMeeting?: string;
+      newDate?: string;
+      reason?: string;
+    },
+  ): Promise<boolean> {
+    const titles: Record<string, string> = {
+      order_assigned: `Назначен заказ №${orderId}`,
+      order_rescheduled: `Заказ №${orderId} перенесен`,
+      order_cancelled: `Заказ №${orderId} отменен`,
+      order_reassigned: `Заказ №${orderId} отдан другому мастеру`,
+    };
+
+    let body = '';
+    switch (notificationType) {
+      case 'order_assigned':
+        body = data?.address || data?.clientName || 'Новый заказ';
+        break;
+      case 'order_rescheduled':
+        if (data?.newDate) {
+          const date = new Date(data.newDate);
+          body = `на ${date.toLocaleDateString('ru-RU')} ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+        } else {
+          body = 'Дата изменена';
+        }
+        break;
+      case 'order_cancelled':
+        body = data?.reason || 'Заказ отменен';
+        break;
+      case 'order_reassigned':
+        body = 'Заказ передан другому мастеру';
+        break;
+    }
+
+    return this.sendMasterPush(odooMasterId, {
+      title: titles[notificationType],
+      body,
+      type: notificationType,
+      orderId,
+      url: `/orders/${orderId}`,
+      requireInteraction: notificationType === 'order_assigned',
+      data,
+    });
+  }
+
+  /**
+   * Тестовый push для мастера
+   */
+  async sendMasterTestPush(odooMasterId: number): Promise<boolean> {
+    return this.sendMasterPush(odooMasterId, {
+      title: 'Новые Схемы',
+      body: 'Уведомления включены',
+      type: 'test',
+      url: '/orders',
+    });
+  }
 }

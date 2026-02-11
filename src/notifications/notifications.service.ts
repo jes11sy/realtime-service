@@ -486,7 +486,7 @@ export class NotificationsService {
    */
   async notifyMaster(
     odooMasterId: number,
-    notificationType: 'master_assigned' | 'master_order_rescheduled' | 'master_order_rejected',
+    notificationType: 'master_assigned' | 'master_order_rescheduled' | 'master_order_rejected' | 'master_order_reassigned',
     orderId: number,
     options?: {
       clientName?: string;
@@ -500,6 +500,7 @@ export class NotificationsService {
       master_assigned: '👷 Назначен заказ',
       master_order_rescheduled: '📅 Заказ перенесён',
       master_order_rejected: '❌ Заказ отменён',
+      master_order_reassigned: '🔄 Заказ передан',
     };
 
     let message = `Заказ #${orderId}`;
@@ -512,6 +513,8 @@ export class NotificationsService {
       if (options?.newDate) message += `\nНовая дата: ${options.newDate}`;
     } else if (notificationType === 'master_order_rejected') {
       if (options?.reason) message += `\nПричина: ${options.reason}`;
+    } else if (notificationType === 'master_order_reassigned') {
+      message = `Заказ #${orderId} отдан другому мастеру`;
     }
 
     // TODO: Нужно получить userId мастера по odooMasterId из БД
@@ -527,6 +530,23 @@ export class NotificationsService {
       this.logger.warn(`Master with odooId ${odooMasterId} not found online, notification will be stored when they connect`);
       // Всё равно создаём уведомление - оно будет доступно когда мастер подключится
     }
+
+    // ✅ Отправляем PUSH-уведомление мастеру (если подписан)
+    const pushTypeMap: Record<string, 'order_assigned' | 'order_rescheduled' | 'order_cancelled' | 'order_reassigned'> = {
+      master_assigned: 'order_assigned',
+      master_order_rescheduled: 'order_rescheduled',
+      master_order_rejected: 'order_cancelled',
+      master_order_reassigned: 'order_reassigned',
+    };
+    
+    this.pushService.sendMasterOrderPush(
+      odooMasterId,
+      pushTypeMap[notificationType],
+      orderId,
+      options,
+    ).catch(err => {
+      this.logger.warn(`Failed to send push to master ${odooMasterId}: ${err.message}`);
+    });
 
     return this.createNotification({
       userId: odooMasterId, // TODO: заменить на реальный odoo_id из БД

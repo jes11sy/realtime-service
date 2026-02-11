@@ -253,11 +253,11 @@ export class NotifyMasterDto {
   odooMasterId: number;
 
   @ApiProperty({ 
-    enum: ['master_assigned', 'master_order_rescheduled', 'master_order_rejected'], 
+    enum: ['master_assigned', 'master_order_rescheduled', 'master_order_rejected', 'master_order_reassigned'], 
     description: 'Тип уведомления' 
   })
   @IsString()
-  notificationType: 'master_assigned' | 'master_order_rescheduled' | 'master_order_rejected';
+  notificationType: 'master_assigned' | 'master_order_rescheduled' | 'master_order_rejected' | 'master_order_reassigned';
 
   @ApiProperty({ description: 'ID заказа' })
   @IsNumber()

@@ -160,4 +160,61 @@ export class PushController {
       userId,
     };
   }
+
+  // ============ MASTER PUSH ENDPOINTS ============
+
+  @Post('master/subscribe')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Подписать мастера на push-уведомления' })
+  async masterSubscribe(
+    @Req() req: AuthRequest,
+    @Body() dto: SubscribeDto,
+  ) {
+    // Для мастеров userId из JWT = odooMasterId
+    const odooMasterId = req.user.userId;
+    
+    console.log(`[Push Master] Subscribe: odooMasterId=${odooMasterId}, login=${req.user.login}`);
+    
+    const success = await this.pushService.saveMasterSubscription(odooMasterId, dto.subscription);
+    
+    return {
+      success,
+      message: success ? 'Подписка сохранена' : 'Ошибка сохранения подписки',
+      odooMasterId,
+    };
+  }
+
+  @Post('master/unsubscribe')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Отписать мастера от push-уведомлений' })
+  async masterUnsubscribe(
+    @Req() req: AuthRequest,
+    @Body() dto: UnsubscribeDto,
+  ) {
+    const odooMasterId = req.user.userId;
+    
+    const success = await this.pushService.removeMasterSubscription(odooMasterId, dto.endpoint);
+    
+    return {
+      success,
+      message: success ? 'Подписка удалена' : 'Ошибка удаления подписки',
+    };
+  }
+
+  @Post('master/test')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Отправить тестовое push мастеру' })
+  async masterSendTest(@Req() req: AuthRequest) {
+    const odooMasterId = req.user.userId;
+    
+    console.log(`[Push Master] Test: odooMasterId=${odooMasterId}, login=${req.user.login}`);
+    
+    const success = await this.pushService.sendMasterTestPush(odooMasterId);
+    
+    return {
+      success,
+      message: success ? 'Тестовое уведомление отправлено' : 'Не удалось отправить (нет подписки)',
+      odooMasterId,
+    };
+  }
 }
