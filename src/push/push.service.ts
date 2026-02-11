@@ -453,6 +453,8 @@ export class PushService implements OnModuleInit {
       data: payload.data,
     });
 
+    this.logger.debug(`[Push Master] Sending push to ${subscriptions.length} devices, payload: ${pushPayload}`);
+
     let successCount = 0;
     const failedEndpoints: string[] = [];
 
