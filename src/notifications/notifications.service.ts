@@ -532,21 +532,21 @@ export class NotificationsService {
     },
   ): Promise<UINotification | null> {
     const titles: Record<string, string> = {
-      master_assigned: '👷 Назначен заказ',
-      master_order_rescheduled: '📅 Заказ перенесён',
-      master_order_rejected: '❌ Заказ отменён',
-      master_order_reassigned: '🔄 Заказ передан',
+      master_assigned: 'Назначен заказ',
+      master_order_rescheduled: 'Заказ перенесён',
+      master_order_rejected: 'Заказ отменён',
+      master_order_reassigned: 'Заказ передан',
     };
 
     let message = `Заказ #${orderId}`;
     
     if (notificationType === 'master_assigned') {
       if (options?.clientName) message += ` - ${options.clientName}`;
-      if (options?.city) message += `\n📍 ${options.city}`;
+      if (options?.city) message += `\n${options.city}`;
       if (options?.address) message += ` ${options.address}`;
       if (options?.dateMeeting) {
         const date = new Date(options.dateMeeting);
-        message += `\n🗓 ${date.toLocaleDateString('ru-RU')} ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+        message += `\n${date.toLocaleDateString('ru-RU')} ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
       }
     } else if (notificationType === 'master_order_rescheduled') {
       if (options?.newDate) message += `\nНовая дата: ${options.newDate}`;
