@@ -460,15 +460,23 @@ export class NotificationsService {
       order_modern: `#${orderId}${masterName ? ` взял в модерн ${masterName}` : ''}`,
     };
 
-    // Получаем директоров онлайн с этим городом
-    const users = this.eventsGateway.getConnectedUsers();
-    const directors = users.filter(u => u.role === 'director');
-    
-    // TODO: Здесь нужна проверка города директора из БД
-    // Пока отправляем всем директорам онлайн
-    // В будущем: запрос к users-service для получения директоров по городу
-    
-    const directorIds = [...new Set(directors.map(u => u.userId))];
+    // ✅ Получаем директоров по городу из БД через users-service
+    let directorIds: number[] = [];
+    try {
+      const usersServiceUrl = process.env.USERS_SERVICE_URL || 'http://users-service:5002';
+      const response = await fetch(`${usersServiceUrl}/directors/by-city/${encodeURIComponent(city)}`);
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && Array.isArray(result.data)) {
+          directorIds = result.data.map((d: any) => d.id);
+        }
+      } else {
+        this.logger.warn(`Failed to fetch directors for city ${city}: ${response.status}`);
+      }
+    } catch (err) {
+      this.logger.error(`Error fetching directors for city ${city}: ${err.message}`);
+    }
     
     this.logger.log(`Notifying ${directorIds.length} directors about ${notificationType} for order #${orderId} in ${city}`);
 
