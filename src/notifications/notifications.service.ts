@@ -464,7 +464,7 @@ export class NotificationsService {
     let directorIds: number[] = [];
     try {
       const usersServiceUrl = process.env.USERS_SERVICE_URL || 'http://users-service:5002';
-      const response = await fetch(`${usersServiceUrl}/directors/by-city/${encodeURIComponent(city)}`);
+      const response = await fetch(`${usersServiceUrl}/api/v1/directors/by-city/${encodeURIComponent(city)}`);
       
       if (response.ok) {
         const result = await response.json();
