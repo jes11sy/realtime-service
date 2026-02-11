@@ -434,30 +434,35 @@ export class NotificationsService {
    */
   async notifyDirectorsByCity(
     city: string,
-    notificationType: 'order_new' | 'order_accepted' | 'order_rescheduled' | 'order_rejected' | 'order_refusal' | 'order_closed' | 'order_modern',
+    notificationType: 'order_new' | 'order_accepted' | 'order_rescheduled' | 'order_rejected' | 'order_refusal' | 'order_closed' | 'order_modern' | 'order_city_changed',
     orderId: number,
     clientName?: string,
     masterName?: string,
     data?: Record<string, any>,
   ): Promise<void> {
     const titles: Record<string, string> = {
-      order_new: '🆕 Новый заказ',
-      order_accepted: '✅ Заказ принят',
-      order_rescheduled: '📅 Заказ перенесён',
-      order_rejected: '❌ Незаказ',
-      order_refusal: '🚫 Отказ',
-      order_closed: '🔒 Заказ закрыт',
-      order_modern: '⏳ Заказ в модерн',
+      order_new: 'Новый заказ',
+      order_accepted: 'Заказ принят',
+      order_rescheduled: 'Заказ перенесён',
+      order_rejected: 'Незаказ',
+      order_refusal: 'Отказ',
+      order_closed: 'Заказ закрыт',
+      order_modern: 'Заказ в модерн',
+      order_city_changed: 'Заказ сменил город',
     };
 
+    const formatAddress = (address?: string) => address || 'Адрес не указан';
+    const formatDate = (date?: string) => date || 'Дата не указана';
+
     const messages: Record<string, string> = {
-      order_new: `#${orderId} ${city}${clientName ? ` - ${clientName}` : ''}`,
-      order_accepted: `#${orderId}${masterName ? ` принял ${masterName}` : ''}`,
-      order_rescheduled: `#${orderId}${clientName ? ` - ${clientName}` : ''}`,
-      order_rejected: `#${orderId}${clientName ? ` - ${clientName}` : ''}`,
-      order_refusal: `#${orderId}${clientName ? ` - ${clientName}` : ''}`,
-      order_closed: `#${orderId}${masterName ? ` закрыл ${masterName}` : ''}`,
-      order_modern: `#${orderId}${masterName ? ` взял в модерн ${masterName}` : ''}`,
+      order_new: `Заказ #${orderId} ${city} ${formatAddress(data?.address)} ${formatDate(data?.dateMeeting)}`,
+      order_accepted: `Заказ #${orderId} ${city} ${formatAddress(data?.address)} ${formatDate(data?.dateMeeting)}`,
+      order_rescheduled: `Заказ #${orderId} ${city} ${formatAddress(data?.address)} Перенесён на: ${formatDate(data?.newDateMeeting || data?.dateMeeting)}`,
+      order_rejected: `Заказ #${orderId} ${city} ${formatAddress(data?.address)} ${formatDate(data?.dateMeeting)}`,
+      order_refusal: `Заказ #${orderId} ${city} ${formatAddress(data?.address)} ${formatDate(data?.dateMeeting)}`,
+      order_closed: `Заказ #${orderId} закрыл ${masterName || 'мастер'}`,
+      order_modern: `Заказ #${orderId} взял в модерн ${masterName || 'мастер'}`,
+      order_city_changed: `Заказ #${orderId} переехал из ${data?.oldCity || 'город'} в ${city}`,
     };
 
     // ✅ Получаем директоров по городу из БД через users-service

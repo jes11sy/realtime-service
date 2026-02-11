@@ -18,6 +18,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
  * - order_refusal - заказ стал отказом
  * - order_closed - мастер закрыл заказ
  * - order_modern - заказ взят в модерн
+ * - order_city_changed - заказ сменил город
  * 
  * Мастер:
  * - master_assigned - назначен на заказ
@@ -39,6 +40,7 @@ export enum NotificationType {
   ORDER_REFUSAL = 'order_refusal',
   ORDER_CLOSED = 'order_closed',
   ORDER_MODERN = 'order_modern',
+  ORDER_CITY_CHANGED = 'order_city_changed',
   
   // Мастер
   MASTER_ASSIGNED = 'master_assigned',
@@ -222,11 +224,11 @@ export class NotifyDirectorsByCityDto {
   city: string;
 
   @ApiProperty({ 
-    enum: ['order_new', 'order_accepted', 'order_rescheduled', 'order_rejected', 'order_refusal', 'order_closed', 'order_modern'], 
+    enum: ['order_new', 'order_accepted', 'order_rescheduled', 'order_rejected', 'order_refusal', 'order_closed', 'order_modern', 'order_city_changed'], 
     description: 'Тип уведомления' 
   })
   @IsString()
-  notificationType: 'order_new' | 'order_accepted' | 'order_rescheduled' | 'order_rejected' | 'order_refusal' | 'order_closed' | 'order_modern';
+  notificationType: 'order_new' | 'order_accepted' | 'order_rescheduled' | 'order_rejected' | 'order_refusal' | 'order_closed' | 'order_modern' | 'order_city_changed';
 
   @ApiProperty({ description: 'ID заказа' })
   @IsNumber()

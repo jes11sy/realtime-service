@@ -620,7 +620,7 @@ export class PushService implements OnModuleInit {
    */
   async sendDirectorOrderPush(
     userId: number,
-    notificationType: 'order_new' | 'order_accepted' | 'order_rescheduled' | 'order_rejected' | 'order_refusal' | 'order_closed' | 'order_modern',
+    notificationType: 'order_new' | 'order_accepted' | 'order_rescheduled' | 'order_rejected' | 'order_refusal' | 'order_closed' | 'order_modern' | 'order_city_changed',
     orderId: number,
     data?: {
       city?: string;
@@ -628,46 +628,53 @@ export class PushService implements OnModuleInit {
       masterName?: string;
       address?: string;
       dateMeeting?: string;
+      newDateMeeting?: string;
+      oldCity?: string;
     },
   ): Promise<boolean> {
     const titles: Record<string, string> = {
-      order_new: `🆕 Новый заказ №${orderId}`,
-      order_accepted: `✅ Заказ №${orderId} принят`,
-      order_rescheduled: `📅 Заказ №${orderId} перенесён`,
-      order_rejected: `❌ Незаказ №${orderId}`,
-      order_refusal: `🚫 Отказ №${orderId}`,
-      order_closed: `🔒 Заказ №${orderId} закрыт`,
-      order_modern: `⏳ Заказ №${orderId} в модерн`,
+      order_new: `Новый заказ №${orderId}`,
+      order_accepted: `Заказ №${orderId} принят`,
+      order_rescheduled: `Заказ №${orderId} перенесён`,
+      order_rejected: `Незаказ №${orderId}`,
+      order_refusal: `Отказ №${orderId}`,
+      order_closed: `Заказ №${orderId} закрыт`,
+      order_modern: `Заказ №${orderId} в модерн`,
+      order_city_changed: `Заказ №${orderId} сменил город`,
     };
+
+    const formatAddress = (address?: string) => address || 'Адрес не указан';
+    const formatDate = (date?: string) => date || 'Дата не указана';
 
     let body = '';
     switch (notificationType) {
       case 'order_new':
-        const newParts: string[] = [];
-        if (data?.city) newParts.push(data.city);
-        if (data?.address) newParts.push(data.address);
-        if (data?.clientName) newParts.push(data.clientName);
-        body = newParts.length > 0 ? newParts.join('\n') : 'Новый заказ';
-        break;
       case 'order_accepted':
-        body = data?.masterName ? `Принял ${data.masterName}` : 'Заказ принят';
+      case 'order_rejected':
+      case 'order_refusal':
+        // Номер заказа, город, улица, дата встречи
+        const parts: string[] = [];
+        if (data?.city) parts.push(data.city);
+        parts.push(formatAddress(data?.address));
+        parts.push(formatDate(data?.dateMeeting));
+        body = parts.join('\n');
         break;
       case 'order_rescheduled':
-        body = data?.clientName ? `${data.clientName}` : 'Заказ перенесён';
-        break;
-      case 'order_rejected':
-        body = data?.clientName ? `${data.clientName}` : 'Незаказ';
-        break;
-      case 'order_refusal':
-        body = data?.clientName ? `${data.clientName}` : 'Отказ';
-        if (data?.masterName) body += `\n${data.masterName}`;
+        // Номер заказа, город, улица, Перенесён на: новая дата
+        const rescheduleParts: string[] = [];
+        if (data?.city) rescheduleParts.push(data.city);
+        rescheduleParts.push(formatAddress(data?.address));
+        rescheduleParts.push(`Перенесён на: ${formatDate(data?.newDateMeeting || data?.dateMeeting)}`);
+        body = rescheduleParts.join('\n');
         break;
       case 'order_closed':
         body = data?.masterName ? `Закрыл ${data.masterName}` : 'Заказ закрыт';
         break;
       case 'order_modern':
         body = data?.masterName ? `Взял в модерн ${data.masterName}` : 'Заказ взят в модерн';
-        if (data?.clientName) body += `\n${data.clientName}`;
+        break;
+      case 'order_city_changed':
+        body = `Переехал из ${data?.oldCity || 'город'} в ${data?.city || 'город'}`;
         break;
     }
 

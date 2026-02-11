@@ -326,6 +326,40 @@ export class NotificationsController {
   }
 
   /**
+   * Директор: Уведомление об изменении города заказа (internal)
+   */
+  @Post('internal/notifications/city-change')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Уведомить директоров об изменении города заказа (internal API)' })
+  @ApiResponse({ status: 200, description: 'Уведомления отправлены' })
+  async notifyCityChange(@Body() dto: { orderId: number; oldCity: string; newCity: string; clientName?: string }) {
+    // Уведомляем директоров НОВОГО города
+    await this.notificationsService.notifyDirectorsByCity(
+      dto.newCity,
+      'order_city_changed',
+      dto.orderId,
+      dto.clientName,
+      undefined,
+      { oldCity: dto.oldCity, city: dto.newCity },
+    );
+
+    // Уведомляем директоров СТАРОГО города
+    await this.notificationsService.notifyDirectorsByCity(
+      dto.oldCity,
+      'order_city_changed',
+      dto.orderId,
+      dto.clientName,
+      undefined,
+      { oldCity: dto.oldCity, city: dto.newCity },
+    );
+
+    return {
+      success: true,
+      message: `City change notifications sent to directors of ${dto.oldCity} and ${dto.newCity}`,
+    };
+  }
+
+  /**
    * Мастер: Уведомление (internal)
    */
   @Post('internal/master')
