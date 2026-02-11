@@ -506,6 +506,7 @@ export class PushService implements OnModuleInit {
     switch (notificationType) {
       case 'order_assigned':
         // Формируем детальное сообщение: Город, Адрес, Дата
+        this.logger.debug(`[Push] order_assigned data: ${JSON.stringify(data)}`);
         const parts: string[] = [];
         if (data?.city) parts.push(data.city);
         if (data?.address) parts.push(data.address);
@@ -514,6 +515,7 @@ export class PushService implements OnModuleInit {
           parts.push(date.toLocaleDateString('ru-RU') + ' ' + date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }));
         }
         body = parts.length > 0 ? parts.join('\n') : (data?.clientName || 'Новый заказ');
+        this.logger.debug(`[Push] order_assigned body: ${body}`);
         break;
       case 'order_rescheduled':
         if (data?.newDate) {

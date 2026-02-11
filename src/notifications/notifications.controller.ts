@@ -330,6 +330,7 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Уведомить мастера (internal API)' })
   @ApiResponse({ status: 200, description: 'Уведомление отправлено' })
   async notifyMaster(@Body() dto: NotifyMasterDto) {
+    this.logger.log(`[Notifications Controller] Received: ${JSON.stringify(dto)}`);
     const notification = await this.notificationsService.notifyMaster(
       dto.odooMasterId,
       dto.notificationType,
@@ -337,6 +338,7 @@ export class NotificationsController {
       {
         clientName: dto.clientName,
         address: dto.address,
+        city: dto.city,
         dateMeeting: dto.dateMeeting,
         newDate: dto.newDate,
         reason: dto.reason,
