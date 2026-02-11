@@ -557,4 +557,140 @@ export class PushService implements OnModuleInit {
       url: '/orders',
     });
   }
+
+  // ============ DIRECTOR PUSH METHODS ============
+
+  /**
+   * Отправить push директору (по userId)
+   */
+  async sendDirectorPush(userId: number, payload: PushPayload): Promise<boolean> {
+    if (!this.isConfigured) {
+      this.logger.warn(`Push not configured, skipping push for director ${userId}`);
+      return false;
+    }
+
+    const subscriptions = await this.getAllSubscriptions(userId);
+    if (subscriptions.length === 0) {
+      this.logger.debug(`No push subscriptions found for director ${userId}`);
+      return false;
+    }
+
+    const pushPayload = JSON.stringify({
+      title: payload.title,
+      body: payload.body,
+      icon: payload.icon || '/images/pwa_light.png',
+      badge: payload.badge || '/images/favicon.png',
+      tag: payload.tag || payload.type || 'default',
+      type: payload.type,
+      url: payload.url || '/orders',
+      orderId: payload.orderId,
+      data: payload.data,
+    });
+
+    this.logger.debug(`[Push Director] Sending push to ${subscriptions.length} devices, payload: ${pushPayload}`);
+
+    let successCount = 0;
+    const failedEndpoints: string[] = [];
+
+    for (const subscription of subscriptions) {
+      try {
+        await webpush.sendNotification(subscription, pushPayload);
+        successCount++;
+      } catch (error: any) {
+        if (error.statusCode === 410 || error.statusCode === 404) {
+          failedEndpoints.push(subscription.endpoint);
+        } else {
+          this.logger.error(`Failed to send push to director endpoint: ${error.message}`);
+        }
+      }
+    }
+
+    // Удаляем невалидные подписки
+    for (const endpoint of failedEndpoints) {
+      await this.removeSubscription(userId, endpoint);
+      this.logger.warn(`Removed expired subscription for director ${userId}`);
+    }
+
+    this.logger.log(`Push sent to director ${userId}: ${payload.title} (${successCount}/${subscriptions.length} devices)`);
+    return successCount > 0;
+  }
+
+  /**
+   * Отправить push директорам о заказе
+   */
+  async sendDirectorOrderPush(
+    userId: number,
+    notificationType: 'order_new' | 'order_accepted' | 'order_rescheduled' | 'order_rejected' | 'order_refusal' | 'order_closed' | 'order_modern',
+    orderId: number,
+    data?: {
+      city?: string;
+      clientName?: string;
+      masterName?: string;
+      address?: string;
+      dateMeeting?: string;
+    },
+  ): Promise<boolean> {
+    const titles: Record<string, string> = {
+      order_new: `🆕 Новый заказ №${orderId}`,
+      order_accepted: `✅ Заказ №${orderId} принят`,
+      order_rescheduled: `📅 Заказ №${orderId} перенесён`,
+      order_rejected: `❌ Незаказ №${orderId}`,
+      order_refusal: `🚫 Отказ №${orderId}`,
+      order_closed: `🔒 Заказ №${orderId} закрыт`,
+      order_modern: `⏳ Заказ №${orderId} в модерн`,
+    };
+
+    let body = '';
+    switch (notificationType) {
+      case 'order_new':
+        const newParts: string[] = [];
+        if (data?.city) newParts.push(data.city);
+        if (data?.address) newParts.push(data.address);
+        if (data?.clientName) newParts.push(data.clientName);
+        body = newParts.length > 0 ? newParts.join('\n') : 'Новый заказ';
+        break;
+      case 'order_accepted':
+        body = data?.masterName ? `Принял ${data.masterName}` : 'Заказ принят';
+        break;
+      case 'order_rescheduled':
+        body = data?.clientName ? `${data.clientName}` : 'Заказ перенесён';
+        break;
+      case 'order_rejected':
+        body = data?.clientName ? `${data.clientName}` : 'Незаказ';
+        break;
+      case 'order_refusal':
+        body = data?.clientName ? `${data.clientName}` : 'Отказ';
+        if (data?.masterName) body += `\n${data.masterName}`;
+        break;
+      case 'order_closed':
+        body = data?.masterName ? `Закрыл ${data.masterName}` : 'Заказ закрыт';
+        break;
+      case 'order_modern':
+        body = data?.masterName ? `Взял в модерн ${data.masterName}` : 'Заказ взят в модерн';
+        if (data?.clientName) body += `\n${data.clientName}`;
+        break;
+    }
+
+    return this.sendDirectorPush(userId, {
+      title: titles[notificationType],
+      body,
+      type: notificationType,
+      orderId,
+      url: `/orders/${orderId}`,
+      requireInteraction: notificationType === 'order_new',
+      data,
+    });
+  }
+
+  /**
+   * Тестовый push для директора
+   */
+  async sendDirectorTestPush(userId: number): Promise<boolean> {
+    return this.sendDirectorPush(userId, {
+      title: 'Новые Схемы',
+      body: 'Уведомления включены',
+      type: 'test',
+      url: '/orders',
+    });
+  }
 }

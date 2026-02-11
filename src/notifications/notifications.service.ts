@@ -434,7 +434,7 @@ export class NotificationsService {
    */
   async notifyDirectorsByCity(
     city: string,
-    notificationType: 'order_new' | 'order_accepted' | 'order_rescheduled' | 'order_rejected' | 'order_closed',
+    notificationType: 'order_new' | 'order_accepted' | 'order_rescheduled' | 'order_rejected' | 'order_refusal' | 'order_closed' | 'order_modern',
     orderId: number,
     clientName?: string,
     masterName?: string,
@@ -445,7 +445,9 @@ export class NotificationsService {
       order_accepted: '✅ Заказ принят',
       order_rescheduled: '📅 Заказ перенесён',
       order_rejected: '❌ Незаказ',
+      order_refusal: '🚫 Отказ',
       order_closed: '🔒 Заказ закрыт',
+      order_modern: '⏳ Заказ в модерн',
     };
 
     const messages: Record<string, string> = {
@@ -453,7 +455,9 @@ export class NotificationsService {
       order_accepted: `#${orderId}${masterName ? ` принял ${masterName}` : ''}`,
       order_rescheduled: `#${orderId}${clientName ? ` - ${clientName}` : ''}`,
       order_rejected: `#${orderId}${clientName ? ` - ${clientName}` : ''}`,
+      order_refusal: `#${orderId}${clientName ? ` - ${clientName}` : ''}`,
       order_closed: `#${orderId}${masterName ? ` закрыл ${masterName}` : ''}`,
+      order_modern: `#${orderId}${masterName ? ` взял в модерн ${masterName}` : ''}`,
     };
 
     // Получаем директоров онлайн с этим городом
@@ -469,6 +473,7 @@ export class NotificationsService {
     this.logger.log(`Notifying ${directorIds.length} directors about ${notificationType} for order #${orderId} in ${city}`);
 
     for (const directorId of directorIds) {
+      // Создаем UI уведомление
       await this.createNotification({
         userId: directorId,
         type: notificationType,
@@ -476,6 +481,22 @@ export class NotificationsService {
         message: messages[notificationType],
         orderId,
         data: { city, clientName, masterName, ...data },
+      });
+
+      // ✅ Отправляем PUSH-уведомление директору
+      this.pushService.sendDirectorOrderPush(
+        directorId,
+        notificationType,
+        orderId,
+        {
+          city,
+          clientName,
+          masterName,
+          address: data?.address,
+          dateMeeting: data?.dateMeeting,
+        },
+      ).catch(err => {
+        this.logger.warn(`Failed to send push to director ${directorId}: ${err.message}`);
       });
     }
   }

@@ -149,10 +149,14 @@ export class PushController {
   @ApiOperation({ summary: 'Отправить тестовое push-уведомление' })
   async sendTest(@Req() req: AuthRequest) {
     const userId = req.user.userId;
+    const role = req.user.role;
     
-    console.log(`[Push] Test: userId=${userId}, login=${req.user.login}`);
+    console.log(`[Push] Test: userId=${userId}, role=${role}, login=${req.user.login}`);
     
-    const success = await this.pushService.sendTestPush(userId);
+    // Для директоров используем специальный метод
+    const success = role === 'director' 
+      ? await this.pushService.sendDirectorTestPush(userId)
+      : await this.pushService.sendTestPush(userId);
     
     return {
       success,
