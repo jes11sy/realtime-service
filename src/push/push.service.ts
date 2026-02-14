@@ -441,13 +441,6 @@ export class PushService implements OnModuleInit {
       return false;
     }
 
-    // Ограничиваем размер данных для web push
-    const limitedData = payload.data ? {
-      city: payload.data.city,
-      type: payload.type,
-      orderId: payload.orderId,
-    } : {};
-
     const pushPayload = JSON.stringify({
       title: payload.title,
       body: payload.body,
@@ -457,7 +450,7 @@ export class PushService implements OnModuleInit {
       type: payload.type,
       url: payload.url || '/orders',
       orderId: payload.orderId,
-      data: limitedData,
+      data: payload.data,
     });
 
     this.logger.log(`[Push Master] Sending push to ${subscriptions.length} devices, payload size: ${pushPayload.length} chars`);
@@ -599,13 +592,6 @@ export class PushService implements OnModuleInit {
       return false;
     }
 
-    // Ограничиваем размер данных для web push
-    const limitedData = payload.data ? {
-      city: payload.data.city,
-      type: payload.type,
-      orderId: payload.orderId,
-    } : {};
-
     const pushPayload = JSON.stringify({
       title: payload.title,
       body: payload.body,
@@ -615,7 +601,7 @@ export class PushService implements OnModuleInit {
       type: payload.type,
       url: payload.url || '/orders',
       orderId: payload.orderId,
-      data: limitedData,
+      data: payload.data,
     });
 
     this.logger.log(`[Push Director] Sending push to ${subscriptions.length} devices, payload size: ${pushPayload.length} chars`);
