@@ -561,18 +561,37 @@ export class NotificationsService {
       master_order_reassigned: 'Заказ передан',
     };
 
+    const formatAddress = (address?: string) => address && address.trim() ? address.trim() : 'Адрес не указан';
+    const formatDate = (date?: string) => {
+      if (!date || date.trim() === '') return 'Дата не указана';
+      
+      try {
+        const parsedDate = new Date(date);
+        if (isNaN(parsedDate.getTime())) return 'Дата не указана';
+        
+        return parsedDate.toLocaleDateString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch {
+        return 'Дата не указана';
+      }
+    };
+
     let message = `Заказ #${orderId}`;
     
     if (notificationType === 'master_assigned') {
       if (options?.clientName) message += ` - ${options.clientName}`;
       if (options?.city) message += `\n${options.city}`;
-      if (options?.address) message += ` ${options.address}`;
-      if (options?.dateMeeting) {
-        const date = new Date(options.dateMeeting);
-        message += `\n${date.toLocaleDateString('ru-RU')} ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
-      }
+      message += `\n${formatAddress(options?.address)}`;
+      message += `\n${formatDate(options?.dateMeeting)}`;
     } else if (notificationType === 'master_order_rescheduled') {
-      if (options?.newDate) message += `\nНовая дата: ${options.newDate}`;
+      if (options?.newDate) {
+        message += `\nНовая дата: ${formatDate(options.newDate)}`;
+      }
     } else if (notificationType === 'master_order_rejected') {
       if (options?.reason) message += `\nПричина: ${options.reason}`;
     } else if (notificationType === 'master_order_reassigned') {

@@ -441,6 +441,13 @@ export class PushService implements OnModuleInit {
       return false;
     }
 
+    // Ограничиваем размер данных для web push
+    const limitedData = payload.data ? {
+      city: payload.data.city,
+      type: payload.type,
+      orderId: payload.orderId,
+    } : {};
+
     const pushPayload = JSON.stringify({
       title: payload.title,
       body: payload.body,
@@ -450,10 +457,10 @@ export class PushService implements OnModuleInit {
       type: payload.type,
       url: payload.url || '/orders',
       orderId: payload.orderId,
-      data: payload.data,
+      data: limitedData,
     });
 
-    this.logger.debug(`[Push Master] Sending push to ${subscriptions.length} devices, payload: ${pushPayload}`);
+    this.logger.log(`[Push Master] Sending push to ${subscriptions.length} devices, payload size: ${pushPayload.length} chars`);
 
     let successCount = 0;
     const failedEndpoints: string[] = [];
@@ -466,7 +473,12 @@ export class PushService implements OnModuleInit {
         if (error.statusCode === 410 || error.statusCode === 404) {
           failedEndpoints.push(subscription.endpoint);
         } else {
-          this.logger.error(`Failed to send push to master endpoint: ${error.message}`);
+          this.logger.error(`Failed to send push to master endpoint: ${error.message}`, {
+            statusCode: error.statusCode,
+            body: error.body,
+            endpoint: subscription.endpoint?.substring(0, 50) + '...',
+            payload: pushPayload?.substring(0, 200) + '...'
+          });
         }
       }
     }
@@ -504,6 +516,26 @@ export class PushService implements OnModuleInit {
       order_reassigned: `Заказ №${orderId} отдан другому мастеру`,
     };
 
+    const formatAddress = (address?: string) => address && address.trim() ? address.trim() : 'Адрес не указан';
+    const formatDate = (date?: string) => {
+      if (!date || date.trim() === '') return 'Дата не указана';
+      
+      try {
+        const parsedDate = new Date(date);
+        if (isNaN(parsedDate.getTime())) return 'Дата не указана';
+        
+        return parsedDate.toLocaleDateString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch {
+        return 'Дата не указана';
+      }
+    };
+
     let body = '';
     switch (notificationType) {
       case 'order_assigned':
@@ -511,21 +543,13 @@ export class PushService implements OnModuleInit {
         this.logger.debug(`[Push] order_assigned data: ${JSON.stringify(data)}`);
         const parts: string[] = [];
         if (data?.city) parts.push(data.city);
-        if (data?.address) parts.push(data.address);
-        if (data?.dateMeeting) {
-          const date = new Date(data.dateMeeting);
-          parts.push(date.toLocaleDateString('ru-RU') + ' ' + date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }));
-        }
-        body = parts.length > 0 ? parts.join('\n') : (data?.clientName || 'Новый заказ');
+        parts.push(formatAddress(data?.address));
+        parts.push(formatDate(data?.dateMeeting));
+        body = parts.join('\n');
         this.logger.debug(`[Push] order_assigned body: ${body}`);
         break;
       case 'order_rescheduled':
-        if (data?.newDate) {
-          const date = new Date(data.newDate);
-          body = `на ${date.toLocaleDateString('ru-RU')} ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
-        } else {
-          body = 'Дата изменена';
-        }
+        body = data?.newDate ? `Перенесён на: ${formatDate(data.newDate)}` : 'Дата изменена';
         break;
       case 'order_cancelled':
         body = data?.reason || 'Заказ отменен';
@@ -575,6 +599,13 @@ export class PushService implements OnModuleInit {
       return false;
     }
 
+    // Ограничиваем размер данных для web push
+    const limitedData = payload.data ? {
+      city: payload.data.city,
+      type: payload.type,
+      orderId: payload.orderId,
+    } : {};
+
     const pushPayload = JSON.stringify({
       title: payload.title,
       body: payload.body,
@@ -584,10 +615,10 @@ export class PushService implements OnModuleInit {
       type: payload.type,
       url: payload.url || '/orders',
       orderId: payload.orderId,
-      data: payload.data,
+      data: limitedData,
     });
 
-    this.logger.debug(`[Push Director] Sending push to ${subscriptions.length} devices, payload: ${pushPayload}`);
+    this.logger.log(`[Push Director] Sending push to ${subscriptions.length} devices, payload size: ${pushPayload.length} chars`);
 
     let successCount = 0;
     const failedEndpoints: string[] = [];
@@ -600,7 +631,12 @@ export class PushService implements OnModuleInit {
         if (error.statusCode === 410 || error.statusCode === 404) {
           failedEndpoints.push(subscription.endpoint);
         } else {
-          this.logger.error(`Failed to send push to director endpoint: ${error.message}`);
+          this.logger.error(`Failed to send push to director endpoint: ${error.message}`, {
+            statusCode: error.statusCode,
+            body: error.body,
+            endpoint: subscription.endpoint?.substring(0, 50) + '...',
+            payload: pushPayload?.substring(0, 200) + '...'
+          });
         }
       }
     }
