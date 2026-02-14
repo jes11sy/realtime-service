@@ -114,7 +114,6 @@ export class PushService implements OnModuleInit {
 
       const totalSubs = await client.hLen(key);
       this.logger.log(`Saved push subscription for user ${userId} (total devices: ${totalSubs})`);
-    this.logger.log(`New endpoint: ${subscription.endpoint}`);
       return true;
     } catch (error) {
       this.logger.error(`Failed to save subscription: ${error.message}`);
@@ -454,7 +453,7 @@ export class PushService implements OnModuleInit {
       data: payload.data,
     });
 
-    this.logger.log(`[Push Master] Sending push to ${subscriptions.length} devices, payload size: ${pushPayload.length} chars`);
+    this.logger.debug(`[Push Master] Sending push to ${subscriptions.length} devices, payload: ${pushPayload}`);
 
     let successCount = 0;
     const failedEndpoints: string[] = [];
@@ -605,7 +604,7 @@ export class PushService implements OnModuleInit {
       data: payload.data,
     });
 
-    this.logger.log(`[Push Director] Sending push to ${subscriptions.length} devices, payload size: ${pushPayload.length} chars`);
+    this.logger.debug(`[Push Director] Sending push to ${subscriptions.length} devices, payload: ${pushPayload}`);
 
     let successCount = 0;
     const failedEndpoints: string[] = [];
@@ -618,10 +617,20 @@ export class PushService implements OnModuleInit {
         if (error.statusCode === 410 || error.statusCode === 404) {
           failedEndpoints.push(subscription.endpoint);
         } else {
-          this.logger.error(`Failed to send push to director endpoint: ${error.message}`);
+          this.logger.error(`Failed to send push to director endpoint:`);
           this.logger.error(`Status: ${error.statusCode}, Body: ${error.body}`);
           this.logger.error(`Endpoint: ${subscription.endpoint?.substring(0, 80)}`);
-          this.logger.error(`Full error:`, error);
+          this.logger.error(`Full error:`);
+          
+          // Детальное логирование для AggregateError
+          if (error.name === 'AggregateError' && error.errors) {
+            this.logger.error(`AggregateError contains ${error.errors.length} errors:`);
+            error.errors.forEach((err: any, idx: number) => {
+              this.logger.error(`  [${idx}] ${err.name}: ${err.message} | code: ${err.code} | cause: ${err.cause}`);
+            });
+          } else {
+            this.logger.error(error.name || error);
+          }
         }
       }
     }
