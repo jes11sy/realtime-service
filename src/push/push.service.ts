@@ -630,6 +630,10 @@ export class PushService implements OnModuleInit {
       dateMeeting?: string;
       newDateMeeting?: string;
       oldCity?: string;
+      total?: string;
+      expense?: string;
+      net?: string;
+      handover?: string;
     },
   ): Promise<boolean> {
     const titles: Record<string, string> = {
@@ -643,8 +647,25 @@ export class PushService implements OnModuleInit {
       order_city_changed: `Заказ №${orderId} сменил город`,
     };
 
-    const formatAddress = (address?: string) => address || 'Адрес не указан';
-    const formatDate = (date?: string) => date || 'Дата не указана';
+    const formatAddress = (address?: string) => address && address.trim() ? address.trim() : 'Адрес не указан';
+    const formatDate = (date?: string) => {
+      if (!date || date.trim() === '') return 'Дата не указана';
+      
+      try {
+        const parsedDate = new Date(date);
+        if (isNaN(parsedDate.getTime())) return 'Дата не указана';
+        
+        return parsedDate.toLocaleDateString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch {
+        return 'Дата не указана';
+      }
+    };
 
     let body = '';
     switch (notificationType) {
@@ -668,7 +689,10 @@ export class PushService implements OnModuleInit {
         body = rescheduleParts.join('\n');
         break;
       case 'order_closed':
-        body = data?.masterName ? `Закрыл ${data.masterName}` : 'Заказ закрыт';
+        const closedParts: string[] = [];
+        if (data?.masterName) closedParts.push(`Закрыл ${data.masterName}`);
+        if (data?.total) closedParts.push(`Итог: ${data.total}`);
+        body = closedParts.length > 0 ? closedParts.join('\n') : 'Заказ закрыт';
         break;
       case 'order_modern':
         body = data?.masterName ? `Взял в модерн ${data.masterName}` : 'Заказ взят в модерн';

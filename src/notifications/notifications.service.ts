@@ -451,8 +451,25 @@ export class NotificationsService {
       order_city_changed: 'Заказ сменил город',
     };
 
-    const formatAddress = (address?: string) => address || 'Адрес не указан';
-    const formatDate = (date?: string) => date || 'Дата не указана';
+    const formatAddress = (address?: string) => address && address.trim() ? address.trim() : 'Адрес не указан';
+    const formatDate = (date?: string) => {
+      if (!date || date.trim() === '') return 'Дата не указана';
+      
+      try {
+        const parsedDate = new Date(date);
+        if (isNaN(parsedDate.getTime())) return 'Дата не указана';
+        
+        return parsedDate.toLocaleDateString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch {
+        return 'Дата не указана';
+      }
+    };
 
     const messages: Record<string, string> = {
       order_new: `Заказ #${orderId} ${city} ${formatAddress(data?.address)} ${formatDate(data?.dateMeeting)}`,
@@ -507,6 +524,12 @@ export class NotificationsService {
           masterName,
           address: data?.address,
           dateMeeting: data?.dateMeeting,
+          newDateMeeting: data?.newDateMeeting,
+          oldCity: data?.oldCity,
+          total: data?.total,
+          expense: data?.expense,
+          net: data?.net,
+          handover: data?.handover,
         },
       ).catch(err => {
         this.logger.warn(`Failed to send push to director ${directorId}: ${err.message}`);
