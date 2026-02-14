@@ -114,6 +114,7 @@ export class PushService implements OnModuleInit {
 
       const totalSubs = await client.hLen(key);
       this.logger.log(`Saved push subscription for user ${userId} (total devices: ${totalSubs})`);
+    this.logger.log(`New endpoint: ${subscription.endpoint}`);
       return true;
     } catch (error) {
       this.logger.error(`Failed to save subscription: ${error.message}`);
@@ -617,12 +618,10 @@ export class PushService implements OnModuleInit {
         if (error.statusCode === 410 || error.statusCode === 404) {
           failedEndpoints.push(subscription.endpoint);
         } else {
-          this.logger.error(`Failed to send push to director endpoint: ${error.message}`, {
-            statusCode: error.statusCode,
-            body: error.body,
-            endpoint: subscription.endpoint?.substring(0, 50) + '...',
-            payload: pushPayload?.substring(0, 200) + '...'
-          });
+          this.logger.error(`Failed to send push to director endpoint: ${error.message}`);
+          this.logger.error(`Status: ${error.statusCode}, Body: ${error.body}`);
+          this.logger.error(`Endpoint: ${subscription.endpoint?.substring(0, 80)}`);
+          this.logger.error(`Full error:`, error);
         }
       }
     }
