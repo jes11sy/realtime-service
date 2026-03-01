@@ -38,18 +38,17 @@ export class BroadcastOrderDto {
   @IsObject()
   order: {
     id: number;
-    rk?: string;
-    city: string;
+    rkId?: number;
+    cityId: number;
     phone: string;
     clientName: string;
     address?: string;
     dateMeeting?: string;
-    typeEquipment?: string;
-    problem?: string;
-    statusOrder: string;
+    equipmentTypeId?: number;
+    statusId: number;
     masterId?: number;
     result?: number;
-    operatorNameId?: number;
+    operatorId?: number;
   };
 
   @ApiProperty({ required: false })

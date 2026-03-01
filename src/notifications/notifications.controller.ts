@@ -243,8 +243,8 @@ export class NotificationsController {
       phone,
       dto.clientName,
       dto.callId,
-      dto.city,
-      dto.avitoName,
+      dto.cityId,
+      dto.rkName,
     );
 
     return {
@@ -270,9 +270,9 @@ export class NotificationsController {
       'operators',
       callType,
       callType === 'call_missed' ? 'Пропущенный звонок' : 'Входящий звонок',
-      `${phone}${dto.city ? ` • ${dto.city}` : ''}${dto.avitoName ? ` • ${dto.avitoName}` : ''}`,
+      `${phone}${dto.cityId ? ` • city:${dto.cityId}` : ''}${dto.rkName ? ` • ${dto.rkName}` : ''}`,
       undefined,
-      { phone, callId: dto.callId, city: dto.city, avitoName: dto.avitoName },
+      { phone, callId: dto.callId, cityId: dto.cityId, rkName: dto.rkName },
     );
 
     return {

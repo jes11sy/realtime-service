@@ -373,8 +373,8 @@ export class NotificationsService {
     phone: string,
     clientName?: string,
     callId?: number,
-    city?: string,
-    avitoName?: string,
+    cityId?: number,
+    rkName?: string,
   ): Promise<UINotification | null> {
     const titles = {
       call_incoming: 'Входящий звонок',
@@ -382,10 +382,9 @@ export class NotificationsService {
     };
 
     let message = clientName ? `${clientName} (${phone})` : phone;
-    if (city) message += ` • ${city}`;
-    if (avitoName) message += ` • ${avitoName}`;
+    if (cityId) message += ` • city:${cityId}`;
+    if (rkName) message += ` • ${rkName}`;
 
-    // Отправляем push-уведомление
     this.pushService.sendCallPush(operatorId, callType, phone, clientName).catch(err => {
       this.logger.warn(`Failed to send push for call: ${err.message}`);
     });
@@ -395,7 +394,7 @@ export class NotificationsService {
       type: callType,
       title: titles[callType],
       message,
-      data: { phone, clientName, callId, city, avitoName },
+      data: { phone, clientName, callId, cityId, rkName },
     });
   }
 

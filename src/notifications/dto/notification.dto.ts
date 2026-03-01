@@ -172,15 +172,15 @@ export class NotifyOperatorCallDto {
   @IsString()
   callDirection?: 'inbound' | 'outbound' | 'callback';
 
-  @ApiPropertyOptional({ description: 'Город' })
+  @ApiPropertyOptional({ description: 'ID города' })
   @IsOptional()
-  @IsString()
-  city?: string;
+  @IsNumber()
+  cityId?: number;
 
-  @ApiPropertyOptional({ description: 'Avito аккаунт' })
+  @ApiPropertyOptional({ description: 'Название РК' })
   @IsOptional()
   @IsString()
-  avitoName?: string;
+  rkName?: string;
 
   @ApiPropertyOptional({ description: 'Имя клиента' })
   @IsOptional()
