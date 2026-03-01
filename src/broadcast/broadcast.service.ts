@@ -58,8 +58,8 @@ export class BroadcastService {
     });
 
     // Broadcast to city room
-    if (order.city) {
-      this.eventsGateway.broadcastToRoom(`city:${order.city}`, 'order:new', order);
+    if (order.cityId) {
+      this.eventsGateway.broadcastToRoom(`city:${order.cityId}`, 'order:new', order);
     }
 
     // Broadcast to master if assigned
@@ -85,8 +85,8 @@ export class BroadcastService {
     this.eventsGateway.broadcastToRoom(`order:${order.id}`, 'order:updated', order);
 
     // Broadcast to city room
-    if (order.city) {
-      this.eventsGateway.broadcastToRoom(`city:${order.city}`, 'order:updated', order);
+    if (order.cityId) {
+      this.eventsGateway.broadcastToRoom(`city:${order.cityId}`, 'order:updated', order);
     }
 
     // Broadcast to master if assigned
